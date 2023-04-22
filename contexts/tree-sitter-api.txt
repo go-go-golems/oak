@@ -1,0 +1,109 @@
+Here is the API of the smacker/tree-sitter library.
+
+type BaseTree
+func (t *BaseTree) Close()
+type EditInput
+type Input
+type InputEncoding
+type IterMode
+type Iterator
+func NewIterator(n *Node, mode IterMode) *Iterator
+func NewNamedIterator(n *Node, mode IterMode) *Iterator
+func (iter *Iterator) ForEach(fn func(*Node) error) error
+func (iter *Iterator) Next() (*Node, error)
+type Language
+func NewLanguage(ptr unsafe.Pointer) *Language
+func (l *Language) FieldName(idx int) string
+func (l *Language) SymbolCount() uint32
+func (l *Language) SymbolName(s Symbol) string
+func (l *Language) SymbolType(s Symbol) SymbolType
+type Node
+func Parse(content []byte, lang *Language) *NodeDEPRECATED
+func ParseCtx(ctx context.Context, content []byte, lang *Language) (*Node, error)
+func (n Node) Child(idx int) *Node
+func (n Node) ChildByFieldName(name string) *Node
+func (n Node) ChildCount() uint32
+func (n Node) Content(input []byte) string
+func (n Node) Edit(i EditInput)
+func (n Node) EndByte() uint32
+func (n Node) EndPoint() Point
+func (n Node) Equal(other *Node) bool
+func (n Node) FieldNameForChild(idx int) string
+func (n Node) HasChanges() bool
+func (n Node) HasError() bool
+func (n Node) IsError() bool
+func (n Node) IsExtra() bool
+func (n Node) IsMissing() bool
+func (n Node) IsNamed() bool
+func (n Node) IsNull() bool
+func (n Node) NamedChild(idx int) *Node
+func (n Node) NamedChildCount() uint32
+func (n Node) NamedDescendantForPointRange(start Point, end Point) *Node
+func (n Node) NextNamedSibling() *Node
+func (n Node) NextSibling() *Node
+func (n Node) Parent() *Node
+func (n Node) PrevNamedSibling() *Node
+func (n Node) PrevSibling() *Node
+func (n Node) StartByte() uint32
+func (n Node) StartPoint() Point
+func (n Node) String() string
+func (n Node) Symbol() Symbol
+func (n Node) Type() string
+type Parser
+func NewParser() *Parser
+func (p *Parser) Close()
+func (p *Parser) Debug()
+func (p *Parser) OperationLimit() int
+func (p *Parser) Parse(oldTree *Tree, content []byte) *TreeDEPRECATED
+func (p *Parser) ParseCtx(ctx context.Context, oldTree *Tree, content []byte) (*Tree, error)
+func (p *Parser) ParseInput(oldTree *Tree, input Input) *Tree
+func (p *Parser) ParseInputCtx(ctx context.Context, oldTree *Tree, input Input) (*Tree, error)
+func (p *Parser) Reset()
+func (p *Parser) SetIncludedRanges(ranges []Range)
+func (p *Parser) SetLanguage(lang *Language)
+func (p *Parser) SetOperationLimit(limit int)
+type Point
+type Query
+func NewQuery(pattern []byte, lang *Language) (*Query, error)
+func (q *Query) CaptureCount() uint32
+func (q *Query) CaptureNameForId(id uint32) string
+func (q *Query) Close()
+func (q *Query) PatternCount() uint32
+func (q *Query) PredicatesForPattern(patternIndex uint32) []QueryPredicateStep
+func (q *Query) StringCount() uint32
+func (q *Query) StringValueForId(id uint32) string
+type QueryCapture
+type QueryCursor
+func NewQueryCursor() *QueryCursor
+func (qc *QueryCursor) Close()
+func (qc *QueryCursor) Exec(q *Query, n *Node)
+func (qc *QueryCursor) FilterPredicates(m *QueryMatch, input []byte) *QueryMatch
+func (qc *QueryCursor) NextCapture() (*QueryMatch, uint32, bool)
+func (qc *QueryCursor) NextMatch() (*QueryMatch, bool)
+func (qc *QueryCursor) SetPointRange(startPoint Point, endPoint Point)
+type QueryError
+func (qe *QueryError) Error() string
+type QueryErrorType
+type QueryMatch
+type QueryPredicateStep
+type QueryPredicateStepType
+type Range
+type ReadFunc
+type Symbol
+type SymbolType
+func (t SymbolType) String() string
+type Tree
+func (t *Tree) Copy() *Tree
+func (t *Tree) Edit(i EditInput)
+func (t *Tree) RootNode() *Node
+type TreeCursor
+func NewTreeCursor(n *Node) *TreeCursor
+func (c *TreeCursor) Close()
+func (c *TreeCursor) CurrentFieldName() string
+func (c *TreeCursor) CurrentNode() *Node
+func (c *TreeCursor) GoToFirstChild() bool
+func (c *TreeCursor) GoToFirstChildForByte(b uint32) int64
+func (c *TreeCursor) GoToNextSibling() bool
+func (c *TreeCursor) GoToParent() bool
+func (c *TreeCursor) Reset(n *Node)
+

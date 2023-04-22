@@ -1,4 +1,4 @@
-project_name: XXX
+project_name: oak
 
 before:
   hooks:
@@ -9,8 +9,8 @@ before:
 builds:
   - env:
       - CGO_ENABLED=0
-    main: ./cmd/XXX
-    binary: XXX
+    main: ./cmd/oak
+    binary: oak
     goos:
       - linux
 # I am not able to test windows at the time
@@ -27,8 +27,8 @@ changelog:
       - '^docs:'
       - '^test:'
 brews:
-  - name: XXX
-    description: "XXX is a tool"
+  - name: oak
+    description: "oak is a tool"
     homepage: "https://github.com/go-go-golems/XXX"
     tap:
       owner: go-go-golems
