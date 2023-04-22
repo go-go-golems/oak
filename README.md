@@ -54,3 +54,6 @@ Today I want to:
 - [] list supported languages
 - turn an input query into a full command 
 - turn OakCommand into a glazed.Command
+
+- add SQL grammar for tree-sitter, as well as anything else we might need
+  - see https://github.com/smacker/go-tree-sitter/pull/58/files and https://github.com/smacker/go-tree-sitter/issues/57

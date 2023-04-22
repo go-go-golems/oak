@@ -256,10 +256,10 @@ func printNode(n *sitter.Node, depth int, name string) {
 		return
 	}
 	if len(s) <= 1 {
-		fmt.Printf("%s%s%s\n", strings.Repeat("    ", depth), prefix, s)
+		fmt.Printf("%s%s%s\n", strings.Repeat("  ", depth), prefix, s)
 
 	} else {
-		fmt.Printf("%s%s%s [%d-%d]\n", strings.Repeat("    ", depth), prefix, s, n.StartByte(), n.EndByte())
+		fmt.Printf("%s%s%s [%d-%d]\n", strings.Repeat("  ", depth), prefix, s, n.StartByte(), n.EndByte())
 
 	}
 }
