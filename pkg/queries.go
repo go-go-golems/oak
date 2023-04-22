@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/go-go-golems/glazed/pkg/helpers/templating"
 	"github.com/pkg/errors"
 	sitter "github.com/smacker/go-tree-sitter"
 	"gopkg.in/yaml.v3"
 	"io"
+	"regexp"
+	"strings"
 	"text/template"
 )
 
@@ -203,4 +206,60 @@ func (cmd *OakCommand) Parse(ctx context.Context, code []byte) (*sitter.Tree, er
 	}
 
 	return tree, nil
+}
+
+// DumpTree prints the tree out to the console. This is lifted straight from example_test
+// in the smacker/sitter repo.
+//
+// The output format is:
+//
+// source_file [0-29]
+//
+//	function_declaration [0-29]
+//	    func [0-4]
+//	    name: identifier [5-6]
+//	    parameters: parameter_list [6-29]
+//	        ( [6-7]
+//	        parameter_declaration [7-18]
+//	            name: identifier [7-8]
+//	            , [8-9]
+//	            name: identifier [10-11]
+//	            , [11-12]
+//	            name: identifier [13-14]
+//	            type: type_identifier [15-18]
+//
+// The recursive cursor walker from the documentation didn't seem to work, at least on the hcl file.
+func (cmd *OakCommand) DumpTree(tree *sitter.Tree) {
+	var visit2 func(n *sitter.Node, name string, depth int)
+	visit2 = func(n *sitter.Node, name string, depth int) {
+		printNode(n, depth, name)
+		for i := 0; i < int(n.ChildCount()); i++ {
+			visit2(n.Child(i), n.FieldNameForChild(i), depth+1)
+		}
+
+	}
+	visit2(tree.RootNode(), "root", 0)
+}
+
+func printNode(n *sitter.Node, depth int, name string) {
+	prefix := ""
+	if name != "" {
+		prefix = name + ": "
+	}
+	s := n.Type()
+	// if s is whitespace, skip
+	matched, err := regexp.MatchString(`^\s+$`, s)
+	if err != nil {
+		panic(err)
+	}
+	if matched {
+		return
+	}
+	if len(s) <= 1 {
+		fmt.Printf("%s%s%s\n", strings.Repeat("    ", depth), prefix, s)
+
+	} else {
+		fmt.Printf("%s%s%s [%d-%d]\n", strings.Repeat("    ", depth), prefix, s, n.StartByte(), n.EndByte())
+
+	}
 }

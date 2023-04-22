@@ -45,9 +45,12 @@ Use tree-sitter to run queries against programming language files.
 
 Today I want to:
 
-- run queries against a file to understand how queries work
-- figure out how to filter query results to only return interesting
-  - that's calleld tree-sitter query predicates
-- query against a terraform
-- list supported languages
+- [x] run queries against a file to understand how queries work
+
+- [] figure out how to filter query results to only return interesting
+  - that's called tree-sitter query predicates
+
+- [x] query against a terraform
+- [] list supported languages
 - turn an input query into a full command 
+- turn OakCommand into a glazed.Command
