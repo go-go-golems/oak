@@ -1,0 +1,43 @@
+Here is an example of our input DSL.
+
+It contains a list of tree-sitter queries used to query an input AST in the given language.
+The named captures can then be used to render the template.
+
+```yaml
+language: go
+
+queries:
+  - name: functionDeclarations
+    query: |
+      (function_declaration
+        name: (identifier) @name
+        parameters: (parameter_list)
+        body: (block)
+        (comment) @comment)
+  - name: importStatements
+    query: |
+      (import_declaration
+        (import_spec
+          (identifier) @importName))
+  - name: variableDeclarations
+    query: |
+      (variable_declaration
+        (identifier) @varName)
+
+template: |
+  Function Declarations:
+  {{ range .functionDeclarations }}
+  - Name: {{ .name.text }}
+    Comment: {{ .comment.text }}
+  {{ end }}
+
+  Import Statements:
+  {{ range .importStatements }}
+  - Name: {{ .importName.text }}
+  {{ end }}
+
+  Variable Declarations:
+  {{ range .variableDeclarations }}
+  - Name: {{ .varName.text }}
+  {{ end }}
+```

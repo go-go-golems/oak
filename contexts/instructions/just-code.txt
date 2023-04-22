@@ -1,0 +1,1 @@
+Only output the function. No prose, no package imports, no explanations, no main function, just code.

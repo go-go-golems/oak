@@ -8,6 +8,7 @@ eq?, not-eq?
 match?, not-match?
 Usage example:
 
+```go
 func main() {
 	// Javascript code
 	sourceCode := []byte(`
@@ -40,6 +41,7 @@ func main() {
 		}
 	}
 }
+```
 
 // Output of this program:
 // SCREAMING_SNAKE_CASE_CONST

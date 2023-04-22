@@ -1,0 +1,5 @@
+Write:
+  - the necessary structures to parse the DSL into a struct OakCommand
+  - a NewOakCommandFromReader method to load a DSL from YAML
+  - a method ExecuteQuery(tree, sourceCode) on OakCommand to return a map[string]Result
+  - a method RenderTemplate(results) on OakCommand to render a template with the results
