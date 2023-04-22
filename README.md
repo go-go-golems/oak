@@ -40,3 +40,14 @@ Use tree-sitter to run queries against programming language files.
   |_|  \___/   \____||_| |_|/_/   \_\\___/ |____/(_)
                                                     
 ```
+
+## Brainstorming (2023-04-22)
+
+Today I want to:
+
+- run queries against a file to understand how queries work
+- figure out how to filter query results to only return interesting
+  - that's calleld tree-sitter query predicates
+- query against a terraform
+- list supported languages
+- turn an input query into a full command 

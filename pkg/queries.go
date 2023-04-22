@@ -2,18 +2,21 @@ package pkg
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"github.com/go-go-golems/glazed/pkg/helpers/templating"
+	"github.com/pkg/errors"
 	sitter "github.com/smacker/go-tree-sitter"
-	"github.com/smacker/go-tree-sitter/golang"
 	"gopkg.in/yaml.v3"
 	"io"
+	"text/template"
 )
 
 type OakCommand struct {
-	Language string
-	Queries  []Query
-	Template string
+	Language       string
+	Queries        []Query
+	Template       string
+	SitterLanguage *sitter.Language
 }
 
 type Query struct {
@@ -36,27 +39,72 @@ type Result struct {
 	// Name is the name of the query
 	Name string
 	// Matches are the matches for the query
-	Matches []*Match
+	Matches []Match
 }
 
 type QueryResults map[string]*Result
 
-func NewOakCommandFromReader(r io.Reader) (*OakCommand, error) {
+type OakCommandOption func(*OakCommand)
+
+func WithLanguage(lang string) OakCommandOption {
+	return func(cmd *OakCommand) {
+		cmd.Language = lang
+	}
+}
+
+func WithSitterLanguage(lang *sitter.Language) OakCommandOption {
+	return func(cmd *OakCommand) {
+		cmd.SitterLanguage = lang
+	}
+}
+
+func WithQueries(queries ...Query) OakCommandOption {
+	return func(cmd *OakCommand) {
+		cmd.Queries = append(cmd.Queries, queries...)
+	}
+}
+
+func WithTemplate(template string) OakCommandOption {
+	return func(cmd *OakCommand) {
+		cmd.Template = template
+	}
+}
+
+func NewOakCommandFromReader(r io.Reader, options ...OakCommandOption) (*OakCommand, error) {
 	var cmd OakCommand
 	err := yaml.NewDecoder(r).Decode(&cmd)
 	if err != nil {
 		return nil, err
 	}
+
+	for _, option := range options {
+		option(&cmd)
+	}
 	return &cmd, nil
 }
 
-func (cmd *OakCommand) ExecuteQueries(tree *sitter.Node, sourceCode []byte) QueryResults {
+func NewOakCommand(options ...OakCommandOption) *OakCommand {
+	cmd := OakCommand{}
+	for _, option := range options {
+		option(&cmd)
+	}
+	return &cmd
+}
+
+func (cmd *OakCommand) ExecuteQueries(tree *sitter.Node, sourceCode []byte) (QueryResults, error) {
+	if cmd.SitterLanguage == nil {
+		lang, err := LanguageNameToSitterLanguage(cmd.Language)
+		if err != nil {
+			return nil, err
+		}
+		cmd.SitterLanguage = lang
+	}
 	results := make(map[string]*Result)
 	for _, query := range cmd.Queries {
-		matches := []*Match{}
+		matches := []Match{}
+
 		// could parse queries up front and return an error if necessary
-		q, err := sitter.NewQuery([]byte(query.Query),
-			golang.GetLanguage())
+		q, err := sitter.NewQuery([]byte(query.Query), cmd.SitterLanguage)
 		if err != nil {
 			switch err := err.(type) {
 			case *sitter.QueryError:
@@ -66,10 +114,10 @@ func (cmd *OakCommand) ExecuteQueries(tree *sitter.Node, sourceCode []byte) Quer
 						line++
 					}
 				}
-				println("error parsing query: ", err.Type, " at line ", line, ":", err.Error())
-				println("query: ", query.Query[err.Offset:])
+
+				return nil, errors.Errorf("error parsing query: %v at line %d", err.Type, line)
 			}
-			continue
+			return nil, err
 		}
 		qc := sitter.NewQueryCursor()
 		qc.Exec(q, tree)
@@ -87,7 +135,7 @@ func (cmd *OakCommand) ExecuteQueries(tree *sitter.Node, sourceCode []byte) Quer
 					Text: c.Node.Content(sourceCode),
 				}
 			}
-			matches = append(matches, &match)
+			matches = append(matches, match)
 		}
 
 		results[query.Name] = &Result{
@@ -96,15 +144,19 @@ func (cmd *OakCommand) ExecuteQueries(tree *sitter.Node, sourceCode []byte) Quer
 		}
 	}
 
-	return results
+	return results, nil
 }
 
-func (cmd *OakCommand) RenderTemplate(results QueryResults) (string, error) {
+func (cmd *OakCommand) Render(results QueryResults) (string, error) {
 	tmpl, err := templating.CreateTemplate("oak").Parse(cmd.Template)
 	if err != nil {
 		return "", err
 	}
 
+	return cmd.RenderWithTemplate(results, err, tmpl)
+}
+
+func (cmd *OakCommand) RenderWithTemplate(results QueryResults, err error, tmpl *template.Template) (string, error) {
 	var buf bytes.Buffer
 	err = tmpl.Execute(&buf, results)
 	if err != nil {
@@ -112,6 +164,15 @@ func (cmd *OakCommand) RenderTemplate(results QueryResults) (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+func (cmd *OakCommand) RenderWithTemplateFile(results QueryResults, file string) (string, error) {
+	tmpl, err := templating.CreateTemplate("oak").ParseFiles(file)
+	if err != nil {
+		return "", err
+	}
+
+	return cmd.RenderWithTemplate(results, err, tmpl)
 }
 
 func (cmd *OakCommand) ResultsToJSON(results QueryResults, f io.Writer) error {
@@ -122,4 +183,24 @@ func (cmd *OakCommand) ResultsToJSON(results QueryResults, f io.Writer) error {
 func (cmd *OakCommand) ResultsToYAML(results QueryResults, f io.Writer) error {
 	enc := yaml.NewEncoder(f)
 	return enc.Encode(results)
+}
+
+func (cmd *OakCommand) Parse(ctx context.Context, code []byte) (*sitter.Tree, error) {
+	if cmd.SitterLanguage == nil {
+		lang, err := LanguageNameToSitterLanguage(cmd.Language)
+		if err != nil {
+			return nil, err
+		}
+
+		cmd.SitterLanguage = lang
+	}
+
+	parser := sitter.NewParser()
+	parser.SetLanguage(cmd.SitterLanguage)
+	tree, err := parser.ParseCtx(ctx, nil, code)
+	if err != nil {
+		return nil, err
+	}
+
+	return tree, nil
 }

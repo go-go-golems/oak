@@ -4,46 +4,152 @@ import (
 	"context"
 	"github.com/go-go-golems/oak/pkg"
 	sitter "github.com/smacker/go-tree-sitter"
-	"github.com/smacker/go-tree-sitter/golang"
+	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
+	"io"
 	"os"
 )
 
 func main() {
-	// load queries/example1.yaml
+	var inputFile string
+	var queryFile string
+	var templateFile string
 
-	f, err := os.Open("queries/example1.yaml")
-	if err != nil {
-		panic(err)
+	rootCmd := &cobra.Command{
+		Use:   "oak",
+		Short: "Oak is a wrapper around tree-sitter",
 	}
 
-	oak, err := pkg.NewOakCommandFromReader(f)
-	if err != nil {
-		panic(err)
+	parseCmd := &cobra.Command{
+		Use:   "parse",
+		Short: "Parse a source code file",
+		Run: func(cmd *cobra.Command, args []string) {
+			// load queries
+			f, err := os.Open(queryFile)
+			cobra.CheckErr(err)
+
+			oak, err := pkg.NewOakCommandFromReader(f)
+			cobra.CheckErr(err)
+
+			sourceCode, err := readFileOrStdin(inputFile)
+			cobra.CheckErr(err)
+
+			ctx := context.Background()
+			tree, err := oak.Parse(ctx, sourceCode)
+
+			results, err := oak.ExecuteQueries(tree.RootNode(), sourceCode)
+			cobra.CheckErr(err)
+
+			// render template if provided
+			var s string
+			if templateFile != "" {
+				s, err = oak.RenderWithTemplateFile(results, templateFile)
+			} else {
+				s, err = oak.Render(results)
+			}
+			cobra.CheckErr(err)
+
+			println(s)
+		},
 	}
 
-	// read pkg/queries.go
-	sourceCode, err := os.ReadFile("pkg/queries.go")
-	if err != nil {
+	parseCmd.Flags().StringVarP(&inputFile, "input-file", "i", "", "Input file path")
+	err := parseCmd.MarkFlagRequired("input-file")
+	cobra.CheckErr(err)
+
+	parseCmd.Flags().StringVarP(&queryFile, "query-file", "q", "", "Query file path")
+	err = parseCmd.MarkFlagRequired("query-file")
+	cobra.CheckErr(err)
+
+	parseCmd.Flags().StringVarP(&templateFile, "template", "t", "", "Template file path")
+
+	queryCmd := &cobra.Command{
+		Use:   "query",
+		Short: "Query a source code file with a plain sitter query",
+		Run: func(cmd *cobra.Command, args []string) {
+			query, err := readFileOrStdin(queryFile)
+			cobra.CheckErr(err)
+
+			language, err := cmd.Flags().GetString("language")
+			cobra.CheckErr(err)
+			queryName, err := cmd.Flags().GetString("query-name")
+			cobra.CheckErr(err)
+
+			var lang *sitter.Language
+			if language != "" {
+				lang, err = pkg.LanguageNameToSitterLanguage(language)
+				cobra.CheckErr(err)
+			} else {
+				lang, err = pkg.FileNameToSitterLanguage(inputFile)
+				cobra.CheckErr(err)
+			}
+
+			if queryName == "" {
+				queryName = "main"
+			}
+
+			oak := pkg.NewOakCommand(pkg.WithQueries(pkg.Query{
+				Name:  queryName,
+				Query: string(query),
+			}),
+				pkg.WithSitterLanguage(lang),
+				pkg.WithTemplate(templateFile))
+
+			sourceCode, err := readFileOrStdin(inputFile)
+			cobra.CheckErr(err)
+
+			ctx := context.Background()
+			tree, err := oak.Parse(ctx, sourceCode)
+			cobra.CheckErr(err)
+
+			results, err := oak.ExecuteQueries(tree.RootNode(), sourceCode)
+
+			// render template if provided
+			if templateFile != "" {
+				s, err := oak.RenderWithTemplateFile(results, templateFile)
+				println(s)
+				cobra.CheckErr(err)
+			} else {
+				matches := []map[string]string{}
+				for _, result := range results {
+					for _, match := range result.Matches {
+						match_ := map[string]string{}
+						for k, v := range match {
+							match_[k] = v.Text
+						}
+						matches = append(matches, match_)
+					}
+				}
+				err = yaml.NewEncoder(os.Stdout).Encode(matches)
+				cobra.CheckErr(err)
+			}
+		},
+	}
+	queryCmd.Flags().StringVarP(&inputFile, "input-file", "i", "", "Input file path")
+	err = queryCmd.MarkFlagRequired("input-file")
+	cobra.CheckErr(err)
+
+	queryCmd.Flags().StringVarP(&queryFile, "query-file", "q", "", "Query file path")
+	err = queryCmd.MarkFlagRequired("query-file")
+	cobra.CheckErr(err)
+
+	queryCmd.Flags().String("query-name", "", "Query name")
+	queryCmd.Flags().String("language", "", "Language name")
+
+	queryCmd.Flags().StringVarP(&templateFile, "template", "t", "", "Template file path")
+
+	rootCmd.AddCommand(parseCmd)
+	rootCmd.AddCommand(queryCmd)
+
+	if err := rootCmd.Execute(); err != nil {
 		panic(err)
 	}
+}
 
-	lang := golang.GetLanguage()
-
-	// Create a parser
-	parser := sitter.NewParser()
-	parser.SetLanguage(lang)
-
-	ctx := context.Background()
-	tree, err := parser.ParseCtx(ctx, nil, sourceCode)
-	if err != nil {
-		panic(err)
+func readFileOrStdin(filename string) ([]byte, error) {
+	if filename == "-" {
+		return io.ReadAll(os.Stdin)
 	}
-
-	results := oak.ExecuteQueries(tree.RootNode(), sourceCode)
-	s, err := oak.RenderTemplate(results)
-	if err != nil {
-		panic(err)
-	}
-
-	println(s)
+	b, err := os.ReadFile(filename)
+	return b, err
 }

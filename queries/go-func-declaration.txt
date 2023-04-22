@@ -1,0 +1,4 @@
+(function_declaration
+  name: (identifier) @name
+  parameters: (parameter_list) @parameters
+  body: (block))
