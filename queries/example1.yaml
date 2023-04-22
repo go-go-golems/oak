@@ -18,14 +18,17 @@ queries:
     query: |
       (function_declaration
         name: (identifier) @name
-        parameters: (parameter_list)
-        body: (block)
-        (comment) @comment)
+        parameters: (parameter_list) @parameters
+        body: (block))
   - name: importStatements
     query: |
       (import_declaration
-        (import_spec
-          (identifier) @importName))
+        (import_spec_list
+          (import_spec
+            (package_identifier) @name
+             path: (interpreted_string_literal) @path)
+          (import_spec
+            path: (interpreted_string_literal) @path)))
   - name: variableDeclarations
     query: |
       (variable_declaration
@@ -33,14 +36,15 @@ queries:
 
 template: |
   Function Declarations:
-  {{ range .functionDeclarations }}
-  - Name: {{ .name.text }}
-    Comment: {{ .comment.text }}
+  {{ range .functionDeclarations.Matches }}
+  - Name: {{ .name.Text }}
+    Parameters: {{ .parameters.Text }}
   {{ end }}
 
   Import Statements:
-  {{ range .importStatements }}
-  - Name: {{ .importName.text }}
+  {{ range .importStatements.Matches }}
+  - Name: {{ .name.Text }}
+    Path: {{ .path.Text }}
   {{ end }}
 
   Variable Declarations:

@@ -54,9 +54,21 @@ func (cmd *OakCommand) ExecuteQueries(tree *sitter.Node, sourceCode []byte) Quer
 	results := make(map[string]*Result)
 	for _, query := range cmd.Queries {
 		matches := []*Match{}
+		// could parse queries up front and return an error if necessary
 		q, err := sitter.NewQuery([]byte(query.Query),
 			golang.GetLanguage())
 		if err != nil {
+			switch err := err.(type) {
+			case *sitter.QueryError:
+				line := 1
+				for i := uint32(0); i < err.Offset; i++ {
+					if query.Query[i] == '\n' {
+						line++
+					}
+				}
+				println("error parsing query: ", err.Type, " at line ", line, ":", err.Error())
+				println("query: ", query.Query[err.Offset:])
+			}
 			continue
 		}
 		qc := sitter.NewQueryCursor()
