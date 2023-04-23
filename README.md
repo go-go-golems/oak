@@ -52,8 +52,27 @@ Today I want to:
 
 - [x] query against a terraform
 - [] list supported languages
-- turn an input query into a full command 
-- turn OakCommand into a glazed.Command
+
+- file pull request for the predicate fix
+
+## Turn OakCommand into a glazed.Command
+
+We have multiple ways of doing it:
+- output templated structured data
+- output a template
+- output a straight list of capture data
+
+Furthermore, we should make the queries templates that are expanded based on the input flags.
+Also, exposing it as a verb means that we have to somehow give the whole thing the input files (as list?).
+
+We can add those input file and language flags as a separate layer (also, --template, potentially multiple output files
+for multiple input files).
+
+I'm not sure how to do the structured templated output.
+
+
+
+## Misc improvements
 
 - add SQL grammar for tree-sitter, as well as anything else we might need
   - see https://github.com/smacker/go-tree-sitter/pull/58/files and https://github.com/smacker/go-tree-sitter/issues/57

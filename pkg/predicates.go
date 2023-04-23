@@ -76,6 +76,8 @@ func FilterPredicates(q *sitter.Query, m *sitter.QueryMatch, input []byte) *sitt
 			Value: value})
 	}
 
+	_ = stepStrings
+
 	operator := q.StringValueForId(steps[0].ValueId)
 
 	switch operator {

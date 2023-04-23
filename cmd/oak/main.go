@@ -37,6 +37,7 @@ func main() {
 
 			ctx := context.Background()
 			tree, err := oak.Parse(ctx, sourceCode)
+			cobra.CheckErr(err)
 
 			results, err := oak.ExecuteQueries(tree.RootNode(), sourceCode)
 			cobra.CheckErr(err)
@@ -58,7 +59,7 @@ func main() {
 	err := runCmd.MarkFlagRequired("input-file")
 	cobra.CheckErr(err)
 
-	runCmd.Flags().StringVarP(&queryFile, "query-file", "q", "", "Query file path")
+	runCmd.Flags().StringVarP(&queryFile, "query-file", "q", "", "SitterQuery file path")
 	err = runCmd.MarkFlagRequired("query-file")
 	cobra.CheckErr(err)
 
@@ -66,7 +67,7 @@ func main() {
 
 	queryCmd := &cobra.Command{
 		Use:   "query",
-		Short: "Query a source code file with a plain sitter query",
+		Short: "SitterQuery a source code file with a plain sitter query",
 		Run: func(cmd *cobra.Command, args []string) {
 			query, err := readFileOrStdin(queryFile)
 			cobra.CheckErr(err)
@@ -89,7 +90,7 @@ func main() {
 				queryName = "main"
 			}
 
-			oak := pkg.NewOakCommand(pkg.WithQueries(pkg.Query{
+			oak := pkg.NewOakCommand(pkg.WithQueries(pkg.SitterQuery{
 				Name:  queryName,
 				Query: string(query),
 			}),
@@ -104,6 +105,7 @@ func main() {
 			cobra.CheckErr(err)
 
 			results, err := oak.ExecuteQueries(tree.RootNode(), sourceCode)
+			cobra.CheckErr(err)
 
 			// render template if provided
 			if templateFile != "" {
@@ -131,11 +133,11 @@ func main() {
 	err = queryCmd.MarkFlagRequired("input-file")
 	cobra.CheckErr(err)
 
-	queryCmd.Flags().StringVarP(&queryFile, "query-file", "q", "", "Query file path")
+	queryCmd.Flags().StringVarP(&queryFile, "query-file", "q", "", "SitterQuery file path")
 	err = queryCmd.MarkFlagRequired("query-file")
 	cobra.CheckErr(err)
 
-	queryCmd.Flags().String("query-name", "", "Query name")
+	queryCmd.Flags().String("query-name", "", "SitterQuery name")
 	queryCmd.Flags().String("language", "", "Language name")
 
 	queryCmd.Flags().StringVarP(&templateFile, "template", "t", "", "Template file path")

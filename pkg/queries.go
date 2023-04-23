@@ -5,6 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/go-go-golems/glazed/pkg/cmds"
+	"github.com/go-go-golems/glazed/pkg/cmds/layers"
+	"github.com/go-go-golems/glazed/pkg/cmds/layout"
 	"github.com/go-go-golems/glazed/pkg/helpers/templating"
 	"github.com/pkg/errors"
 	sitter "github.com/smacker/go-tree-sitter"
@@ -16,17 +19,12 @@ import (
 )
 
 type OakCommand struct {
-	Language       string
-	Queries        []Query
-	Template       string
-	SitterLanguage *sitter.Language
-}
+	Language string        `yaml:"language,omitempty"`
+	Queries  []SitterQuery `yaml:"queries"`
+	Template string        `yaml:"template"`
 
-type Query struct {
-	// Name of the resulting variable after parsing
-	Name string
-	// Query contains the tree-sitter query that will be applied to the source code
-	Query string
+	SitterLanguage *sitter.Language
+	description    *OakCommandDescription
 }
 
 type Capture struct {
@@ -62,7 +60,7 @@ func WithSitterLanguage(lang *sitter.Language) OakCommandOption {
 	}
 }
 
-func WithQueries(queries ...Query) OakCommandOption {
+func WithQueries(queries ...SitterQuery) OakCommandOption {
 	return func(cmd *OakCommand) {
 		cmd.Queries = append(cmd.Queries, queries...)
 	}
@@ -71,6 +69,30 @@ func WithQueries(queries ...Query) OakCommandOption {
 func WithTemplate(template string) OakCommandOption {
 	return func(cmd *OakCommand) {
 		cmd.Template = template
+	}
+}
+
+func (cmd *OakCommand) Run(ctx context.Context,
+	parsedLayers map[string]*layers.ParameterLayer,
+	ps map[string]interface{},
+) error {
+	return nil
+}
+
+func (cmd *OakCommand) Description() *cmds.CommandDescription {
+	d := cmd.description
+	return &cmds.CommandDescription{
+		Name:  d.Name,
+		Short: d.Short,
+		Long:  d.Long,
+		Layout: &layout.Layout{
+			Sections: d.Layout,
+		},
+		Flags:     d.Flags,
+		Arguments: d.Arguments,
+		Layers:    d.Layers,
+		Parents:   d.Parents,
+		Source:    d.Source,
 	}
 }
 
@@ -175,12 +197,12 @@ func (cmd *OakCommand) Render(results QueryResults) (string, error) {
 		return "", err
 	}
 
-	return cmd.RenderWithTemplate(results, err, tmpl)
+	return cmd.RenderWithTemplate(results, tmpl)
 }
 
-func (cmd *OakCommand) RenderWithTemplate(results QueryResults, err error, tmpl *template.Template) (string, error) {
+func (cmd *OakCommand) RenderWithTemplate(results QueryResults, tmpl *template.Template) (string, error) {
 	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, results)
+	err := tmpl.Execute(&buf, results)
 	if err != nil {
 		return "", err
 	}
@@ -194,7 +216,7 @@ func (cmd *OakCommand) RenderWithTemplateFile(results QueryResults, file string)
 		return "", err
 	}
 
-	return cmd.RenderWithTemplate(results, err, tmpl)
+	return cmd.RenderWithTemplate(results, tmpl)
 }
 
 func (cmd *OakCommand) ResultsToJSON(results QueryResults, f io.Writer) error {
@@ -281,4 +303,19 @@ func printNode(n *sitter.Node, depth int, name string) {
 		fmt.Printf("%s%s%s [%d-%d]\n", strings.Repeat("  ", depth), prefix, s, n.StartByte(), n.EndByte())
 
 	}
+}
+
+type OakGlazeCommand struct {
+	*OakCommand
+}
+
+func (c *OakGlazeCommand) Run(
+	ctx context.Context,
+	parsedLayers map[string]*layers.ParsedParameterLayer,
+	ps map[string]interface{},
+	gp cmds.Processor,
+) error {
+
+	return nil
+
 }

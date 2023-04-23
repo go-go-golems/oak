@@ -1,0 +1,9 @@
+(call_expression
+  function: (member_expression
+    object: (member_expression
+      property: (property_identifier) @object_property)
+    property: (property_identifier) @equal_property)
+  arguments: (_) @arguments) @call
+  
+(eq? @object_property "should")
+(eq? @equal_property "equal")
