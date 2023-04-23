@@ -10,7 +10,6 @@ import (
 	"github.com/go-go-golems/glazed/pkg/cmds/layout"
 	"github.com/go-go-golems/glazed/pkg/helpers/templating"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 	sitter "github.com/smacker/go-tree-sitter"
 	"gopkg.in/yaml.v3"
 	"io"
@@ -118,24 +117,6 @@ func NewOakCommand(options ...OakCommandOption) *OakCommand {
 	return &cmd
 }
 
-func SitterQueryErrorTypeToString(errorType sitter.QueryErrorType) string {
-	switch errorType {
-	case sitter.QueryErrorNone:
-		return "none"
-	case sitter.QueryErrorNodeType:
-		return "node type"
-	case sitter.QueryErrorField:
-		return "field"
-	case sitter.QueryErrorCapture:
-		return "capture"
-	case sitter.QueryErrorSyntax:
-		return "syntax"
-	default:
-		return "unknown"
-	}
-
-}
-
 func (cmd *OakCommand) ExecuteQueries(tree *sitter.Node, sourceCode []byte) (QueryResults, error) {
 	if cmd.SitterLanguage == nil {
 		lang, err := LanguageNameToSitterLanguage(cmd.Language)
@@ -153,21 +134,7 @@ func (cmd *OakCommand) ExecuteQueries(tree *sitter.Node, sourceCode []byte) (Que
 		if err != nil {
 			switch err := err.(type) {
 			case *sitter.QueryError:
-				line := 1
-				for i := uint32(0); i < err.Offset; i++ {
-					if query.Query[i] == '\n' {
-						line++
-					}
-				}
-
-				log.Error().
-					Str("query_name", query.Name).
-					Str("query", query.Query).
-					Str("error", SitterQueryErrorTypeToString(err.Type)).
-					Int("line", line).
-					Msg("error parsing query")
-				return nil, errors.Errorf("error parsing query %s: '%v' at line %d",
-					query.Name, SitterQueryErrorTypeToString(err.Type), line)
+				return nil, errors.Errorf("error parsing query %s: '%v'", query.Name, err.Error())
 			}
 			return nil, err
 		}

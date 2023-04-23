@@ -1,0 +1,14 @@
+language: go
+
+queries:
+  - name: testPredicate
+    query: |
+      (binary_expression
+         left: (_) @left
+         right: (_) @right
+       (#eq? @right 1))
+
+template: |
+  {{ range .testPredicate.Matches }}
+  - {{ .left.Text }} - {{.right.Text}}{{ end }}
+  
