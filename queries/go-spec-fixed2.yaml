@@ -1,0 +1,139 @@
+language: go
+
+queries:
+  - name: binaryExpressionsWithNumberLiterals
+    query: |
+      (binary_expression
+        left: (int_literal) @left
+        right: (int_literal) @right)
+
+  - name: binaryExpressionsWithStringLiteral
+    query: |
+      (binary_expression
+        left: (interpreted_string_literal) @string
+        _
+        right: (interpreted_string_literal) @string)
+
+  - name: assignmentExpressionsWithMemberExpression
+    query: |
+      (assignment_statement
+        left: (expression_list
+          (selector_expression
+            operand: (identifier) @member)))
+
+  - name: typeDeclarationsWithoutTypeParameters
+    query: |
+      (type_declaration
+        (type_spec
+          name: (type_identifier) @class_name
+          !type_parameters))
+
+  - name: assignmentOfFunctionToIdentifier
+    query: |
+      (assignment_statement
+        left: (expression_list
+          (identifier) @the_identifier)
+        right: (expression_list
+          (call_expression)))
+
+  - name: methodDefinitionsInStruct
+    query: |
+      (type_declaration
+        (type_spec
+          name: (type_identifier) @the_struct_name
+          type: (struct_type
+            (field_declaration_list
+              (field_declaration
+                name: (field_identifier) @the_method_name)))))
+
+  - name: sequenceOfComments
+    query: |
+      (comment)+ @comments
+
+  - name: typeDeclarationsWithDecorators
+    query: |
+      (type_declaration
+        (comment)* @the_decorator
+        (type_spec
+          name: (type_identifier) @the_name))
+
+  - name: functionCallsWithStringArgument
+    query: |
+      (call_expression
+        function: (identifier) @the_function
+        arguments: (argument_list (interpreted_string_literal)? @the_string_arg))
+
+  - name: commentFollowedByFunctionDeclaration
+    query: |
+      (
+        (comment) @comment
+        (function_declaration) @function
+      )
+
+  - name: commaSeparatedSeriesOfNumbers
+    query: |
+      (
+        (int_literal) @number
+        ("," (int_literal))* @numbers
+      )
+
+  - name: callToVariableOrObjectProperty
+    query: |
+      (call_expression
+        function: [
+          (identifier) @function
+          (selector_expression
+            operand: (identifier)
+            field: (field_identifier) @method)
+        ])
+
+  - name: keywordTokens
+    query: |
+      [
+        "break"
+        "else"
+        "for"
+        "func"
+        "if"
+        "return"
+      ] @keyword
+
+  - name: anyNodeInsideCall
+    query: |
+      (call_expression (_) @call_inner)
+
+  - name: firstIdentifierInArray
+    query: |
+      (slice_type . (type_identifier) @the_element)
+
+  - name: lastExpressionInBlock
+    query: |
+      (block (_) @last_expression .)
+
+  - name: consecutiveIdentifiersInDottedName
+    query: |
+      (selector_expression
+        operand: (identifier) @prev_id
+        field: (field_identifier) @next_id)
+
+  - name: identifierInScreamingSnakeCase
+    query: |
+      (
+        (identifier) @constant
+        (#match? @constant "^[A-Z][A-Z_]+")
+      )
+
+  - name: keyValuePairsWithSameName
+    query: |
+      (
+        (keyed_element
+          (literal_element) @key_name
+          (literal_element) @value_name)
+        (#eq? @key_name @value_name)
+      )
+
+template: |
+  Results:{{ range $v := .Results }}
+    {{ $v.Name }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
+       {{ $captureName }}({{ $captureValue.Type }}): {{ abbrev 50 $captureValue.Text }}{{ end }}
+    {{end}}{{ end }}

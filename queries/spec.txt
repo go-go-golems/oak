@@ -1,75 +1,48 @@
-language: example
-
-queries:
-  - name: binaryExpressionsWithNumberLiterals
-    query: |
       (binary_expression
         (number_literal) @left
         (number_literal) @right)
 
-  - name: binaryExpressionsWithStringLiteral
-    query: |
       (binary_expression
         (string_literal) @string)
 
-  - name: assignmentExpressionsWithMemberExpression
-    query: |
-      (assignment_statement
+      (assignment_expression
         left: (member_expression
           object: (call_expression)) @member)
 
-  - name: classDeclarationsWithoutTypeParameters
-    query: |
       (class_declaration
         name: (identifier) @class_name
         !type_parameters)
 
-  - name: assignmentOfFunctionToIdentifier
-    query: |
-      (assignment_statement
+      (assignment_expression
         left: (identifier) @the_function_name
         right: (function))
 
-  - name: methodDefinitionsInClass
-    query: |
       (class_declaration
         name: (identifier) @the_class_name
         body: (class_body
           (method_definition
             name: (property_identifier) @the_method_name)))
 
-  - name: sequenceOfComments
-    query: |
       (comment)+ @comments
 
-  - name: classDeclarationsWithDecorators
-    query: |
       (class_declaration
         (decorator)* @the_decorator
         name: (identifier) @the_name)
 
-  - name: functionCallsWithStringArgument
-    query: |
       (call_expression
         function: (identifier) @the_function
         arguments: (arguments (string)? @the_string_arg))
 
-  - name: commentFollowedByFunctionDeclaration
-    query: |
       (
         (comment) @comment
         (function_declaration) @function
       )
 
-  - name: commaSeparatedSeriesOfNumbers
-    query: |
       (
         (number) @number
         ("," (number))* @numbers
       )
 
-  - name: callToVariableOrObjectProperty
-    query: |
       (call_expression
         function: [
           (identifier) @function
@@ -77,8 +50,6 @@ queries:
             property: (property_identifier) @method)
         ])
 
-  - name: keywordTokens
-    query: |
       [
         "break"
         "delete"
@@ -91,34 +62,22 @@ queries:
         "while"
       ] @keyword
 
-  - name: anyNodeInsideCall
-    query: |
       (call (_) @call_inner)
 
-  - name: firstIdentifierInArray
-    query: |
       (array . (identifier) @the_element)
 
-  - name: lastExpressionInBlock
-    query: |
       (block (_) @last_expression .)
 
-  - name: consecutiveIdentifiersInDottedName
-    query: |
       (dotted_name
         (identifier) @prev_id
         .
         (identifier) @next_id)
 
-  - name: identifierInScreamingSnakeCase
-    query: |
       (
         (identifier) @constant
         (#match? @constant "^[A-Z][A-Z_]+")
       )
 
-  - name: keyValuePairsWithSameName
-    query: |
       (
         (pair
           key: (property_identifier) @key_name
@@ -126,9 +85,9 @@ queries:
         (#eq? @key_name @value_name)
       )
 
-
 template: |
   Results:{{ range $v := .Results }}
     {{ $v.Name }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
        {{ $captureName }}: {{ $captureValue }}{{ end }}
     {{end}}{{ end }}
+

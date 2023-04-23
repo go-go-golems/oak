@@ -17,6 +17,10 @@ linters:
     - nonamedreturns
     - predeclared
   fast: false
+run:
+  skip-dirs:
+    - test-inputs
+    - contexts
 issues:
   exclude:
     - 'SA1019: cli.CreateProcessorLegacy'

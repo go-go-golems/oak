@@ -1,0 +1,68 @@
+  language: go
+
+  queries:
+    - name: fields
+      query: |
+        (field_declaration
+          name: (field_identifier) @fieldName
+          type: (type_identifier) @fieldType)
+
+    - name: negatedFields
+      query: |
+        (struct_type
+          !field_declaration_list)
+
+    - name: anonymousNodes
+      query: |
+        (binary_expression
+          operator: "!="
+          right: (null))
+
+    - name: capturingNodes
+      query: |
+        (assignment_expression
+          left: (identifier) @variableName
+          right: (function))
+
+    - name: quantificationOperators
+      query: |
+        (call_expression
+          function: (identifier) @functionName
+          arguments: (arguments (string)? @stringArg))
+
+    - name: groupingSiblingNodes
+      query: |
+        (
+          (comment)
+          (function_declaration)
+        )
+
+    - name: alternations
+      query: |
+        (call_expression
+          function: [
+            (identifier) @function
+            (member_expression
+              property: (property_identifier) @method)
+          ])
+
+    - name: wildcardNode
+      query: |
+        (call (_) @callInner)
+
+    - name: anchors
+      query: |
+        (array . (identifier) @firstElement)
+
+    - name: predicates
+      query: |
+        (
+          (identifier) @constant
+          (#match? @constant "^[A-Z][A-Z_]+")
+        )
+
+  template: |
+    Results:{{ range $v := .Results }}
+    {{ $v.Name }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
+    {{ $captureName }}: {{ $captureValue }}{{ end }}
+    {{end}}{{ end }}

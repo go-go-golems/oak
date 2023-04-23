@@ -26,3 +26,8 @@ template: |
   Import Statements:
   {{ range .importStatements.Matches }}
   - {{ if .name }}name: {{ .name.Text }}, {{end -}} path: {{ .path.Text }}{{ end }}
+  
+  Results:{{ range $v := .Results }}
+    {{ $v.Name }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
+       {{ $captureName }}: {{ $captureValue }}{{ end }}
+    {{end}}{{ end }}

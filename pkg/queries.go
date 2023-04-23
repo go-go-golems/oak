@@ -134,14 +134,7 @@ func (cmd *OakCommand) ExecuteQueries(tree *sitter.Node, sourceCode []byte) (Que
 		if err != nil {
 			switch err := err.(type) {
 			case *sitter.QueryError:
-				line := 1
-				for i := uint32(0); i < err.Offset; i++ {
-					if query.Query[i] == '\n' {
-						line++
-					}
-				}
-
-				return nil, errors.Errorf("error parsing query: %v at line %d", err.Type, line)
+				return nil, errors.Errorf("error parsing query %s: '%v'", query.Name, err.Error())
 			}
 			return nil, err
 		}
@@ -201,8 +194,18 @@ func (cmd *OakCommand) Render(results QueryResults) (string, error) {
 }
 
 func (cmd *OakCommand) RenderWithTemplate(results QueryResults, tmpl *template.Template) (string, error) {
+	data := map[string]interface{}{
+		"Results": results,
+	}
+
+	for k, v := range results {
+		data[k] = v
+	}
+
+	// TODO(manuel, 2023-04-23): add a way to pass in additional data
+
 	var buf bytes.Buffer
-	err := tmpl.Execute(&buf, results)
+	err := tmpl.Execute(&buf, data)
 	if err != nil {
 		return "", err
 	}

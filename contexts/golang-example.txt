@@ -1,6 +1,5 @@
 Here is an example of a tree-sitter AST resulting from a golang file:
 
-
 (source_file
   (package_clause
     (package_identifier))
@@ -14,10 +13,24 @@ Here is an example of a tree-sitter AST resulting from a golang file:
         (field_declaration_list
           (field_declaration
             name: (field_identifier)
-            type: (type_identifier))
+            type: (type_identifier)
+            tag: (raw_string_literal))
           (field_declaration
             name: (field_identifier)
             type: (type_identifier))))))
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list
+      (parameter_declaration
+        name: (identifier)
+        type: (type_identifier)))
+    result: (type_identifier)
+    body: (block
+      (return_statement
+        (expression_list
+          (binary_expression
+            left: (identifier)
+            right: (int_literal))))))
   (method_declaration
     receiver: (parameter_list
       (parameter_declaration
@@ -27,6 +40,51 @@ Here is an example of a tree-sitter AST resulting from a golang file:
     name: (field_identifier)
     parameters: (parameter_list)
     body: (block
+      (if_statement
+        condition: (true)
+        consequence: (block
+          (return_statement)))
+      (short_var_declaration
+        left: (expression_list
+          (identifier))
+        right: (expression_list
+          (int_literal)))
+      (assignment_statement
+        left: (expression_list
+          (selector_expression
+            operand: (identifier)
+            field: (field_identifier)))
+        right: (expression_list
+          (identifier)))
+      (assignment_statement
+        left: (expression_list
+          (identifier))
+        right: (expression_list
+          (call_expression
+            function: (identifier)
+            arguments: (argument_list
+              (identifier)))))
+      (for_statement
+        (for_clause
+          initializer: (short_var_declaration
+            left: (expression_list
+              (identifier))
+            right: (expression_list
+              (int_literal)))
+          condition: (binary_expression
+            left: (identifier)
+            right: (int_literal))
+          update: (inc_statement
+            (identifier)))
+        body: (block
+          (inc_statement
+            (identifier))))
+      (if_statement
+        condition: (binary_expression
+          left: (identifier)
+          right: (int_literal))
+        consequence: (block
+          (return_statement)))
       (call_expression
         function: (selector_expression
           operand: (identifier)
