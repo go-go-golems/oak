@@ -52,3 +52,5 @@ require (
 	golang.org/x/text v0.6.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 )
+
+replace github.com/smacker/go-tree-sitter => github.com/wesen/go-tree-sitter v0.0.0-20230423204225-a896a22ee48a
