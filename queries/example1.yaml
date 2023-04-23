@@ -29,5 +29,5 @@ template: |
   
   Results:{{ range $v := .Results }}
     {{ $v.Name }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
-       {{ $captureName }}: {{ $captureValue }}{{ end }}
+       {{ $captureName }}: {{ $captureValue.Text }}{{ end }}
     {{end}}{{ end }}
