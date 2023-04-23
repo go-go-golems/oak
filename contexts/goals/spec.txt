@@ -1,0 +1,13 @@
+Generate a DSL YAML file that covers all queries, using the go AST nodes:
+
+- Fields
+- Negated Fields
+- Anonymous Nodes
+- Capturing Nodes
+- Quantification Operators
+- Grouping Sibling Nodes
+- Alternations
+- Wildcard Node
+- Anchors
+- Predicates
+

@@ -1,58 +1,60 @@
-language: example
+language: go
 
 queries:
   - name: binaryExpressionsWithNumberLiterals
     query: |
       (binary_expression
-        (number_literal) @left
-        (number_literal) @right)
+        (int_literal) @left
+        (int_literal) @right)
 
   - name: binaryExpressionsWithStringLiteral
     query: |
       (binary_expression
-        (string_literal) @string)
+        (interpreted_string_literal) @string)
 
   - name: assignmentExpressionsWithMemberExpression
     query: |
       (assignment_statement
-        left: (member_expression
-          object: (call_expression)) @member)
+        left: (expression_list
+      (selector_expression
+          operand: (identifier))) @member)
 
-  - name: classDeclarationsWithoutTypeParameters
+  - name: typeDeclarationsWithoutTypeParameters
     query: |
-      (class_declaration
-        name: (identifier) @class_name
-        !type_parameters)
+      (type_declaration
+       (type_spec
+        name: (type_identifier) @class_name
+        !type_parameters))
 
   - name: assignmentOfFunctionToIdentifier
     query: |
       (assignment_statement
         left: (identifier) @the_function_name
-        right: (function))
+        right: (function_literal))
 
-  - name: methodDefinitionsInClass
+  - name: methodDefinitionsInStruct
     query: |
-      (class_declaration
-        name: (identifier) @the_class_name
-        body: (class_body
-          (method_definition
-            name: (property_identifier) @the_method_name)))
+      (type_declaration
+        name: (type_identifier) @the_struct_name
+        body: (struct_type
+          (field_declaration
+            name: (field_identifier) @the_method_name)))
 
   - name: sequenceOfComments
     query: |
       (comment)+ @comments
 
-  - name: classDeclarationsWithDecorators
+  - name: typeDeclarationsWithDecorators
     query: |
-      (class_declaration
+      (type_declaration
         (decorator)* @the_decorator
-        name: (identifier) @the_name)
+        name: (type_identifier) @the_name)
 
   - name: functionCallsWithStringArgument
     query: |
       (call_expression
         function: (identifier) @the_function
-        arguments: (arguments (string)? @the_string_arg))
+        arguments: (argument_list (interpreted_string_literal)? @the_string_arg))
 
   - name: commentFollowedByFunctionDeclaration
     query: |
@@ -64,8 +66,8 @@ queries:
   - name: commaSeparatedSeriesOfNumbers
     query: |
       (
-        (number) @number
-        ("," (number))* @numbers
+        (int_literal) @number
+        ("," (int_literal))* @numbers
       )
 
   - name: callToVariableOrObjectProperty
@@ -73,8 +75,8 @@ queries:
       (call_expression
         function: [
           (identifier) @function
-          (member_expression
-            property: (property_identifier) @method)
+          (selector_expression
+            field: (field_identifier) @method)
         ])
 
   - name: keywordTokens
@@ -84,7 +86,7 @@ queries:
         "delete"
         "else"
         "for"
-        "function"
+        "func"
         "if"
         "return"
         "try"
@@ -93,11 +95,11 @@ queries:
 
   - name: anyNodeInsideCall
     query: |
-      (call (_) @call_inner)
+      (call_expression (_) @call_inner)
 
   - name: firstIdentifierInArray
     query: |
-      (array . (identifier) @the_element)
+      (array_type . (type_identifier) @the_element)
 
   - name: lastExpressionInBlock
     query: |
@@ -105,10 +107,9 @@ queries:
 
   - name: consecutiveIdentifiersInDottedName
     query: |
-      (dotted_name
-        (identifier) @prev_id
-        .
-        (identifier) @next_id)
+      (selector_expression
+        operand: (identifier) @prev_id
+        field: (field_identifier) @next_id)
 
   - name: identifierInScreamingSnakeCase
     query: |
@@ -120,12 +121,11 @@ queries:
   - name: keyValuePairsWithSameName
     query: |
       (
-        (pair
-          key: (property_identifier) @key_name
+        (key_value_pair
+          key: (field_identifier) @key_name
           value: (identifier) @value_name)
         (#eq? @key_name @value_name)
       )
-
 
 template: |
   Results:{{ range $v := .Results }}

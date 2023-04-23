@@ -10,6 +10,7 @@ import (
 	"github.com/go-go-golems/glazed/pkg/cmds/layout"
 	"github.com/go-go-golems/glazed/pkg/helpers/templating"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	sitter "github.com/smacker/go-tree-sitter"
 	"gopkg.in/yaml.v3"
 	"io"
@@ -117,6 +118,24 @@ func NewOakCommand(options ...OakCommandOption) *OakCommand {
 	return &cmd
 }
 
+func SitterQueryErrorTypeToString(errorType sitter.QueryErrorType) string {
+	switch errorType {
+	case sitter.QueryErrorNone:
+		return "none"
+	case sitter.QueryErrorNodeType:
+		return "node type"
+	case sitter.QueryErrorField:
+		return "field"
+	case sitter.QueryErrorCapture:
+		return "capture"
+	case sitter.QueryErrorSyntax:
+		return "syntax"
+	default:
+		return "unknown"
+	}
+
+}
+
 func (cmd *OakCommand) ExecuteQueries(tree *sitter.Node, sourceCode []byte) (QueryResults, error) {
 	if cmd.SitterLanguage == nil {
 		lang, err := LanguageNameToSitterLanguage(cmd.Language)
@@ -141,7 +160,14 @@ func (cmd *OakCommand) ExecuteQueries(tree *sitter.Node, sourceCode []byte) (Que
 					}
 				}
 
-				return nil, errors.Errorf("error parsing query: %v at line %d", err.Type, line)
+				log.Error().
+					Str("query_name", query.Name).
+					Str("query", query.Query).
+					Str("error", SitterQueryErrorTypeToString(err.Type)).
+					Int("line", line).
+					Msg("error parsing query")
+				return nil, errors.Errorf("error parsing query %s: '%v' at line %d",
+					query.Name, SitterQueryErrorTypeToString(err.Type), line)
 			}
 			return nil, err
 		}
@@ -201,8 +227,18 @@ func (cmd *OakCommand) Render(results QueryResults) (string, error) {
 }
 
 func (cmd *OakCommand) RenderWithTemplate(results QueryResults, tmpl *template.Template) (string, error) {
+	data := map[string]interface{}{
+		"Results": results,
+	}
+
+	for k, v := range results {
+		data[k] = v
+	}
+
+	// TODO(manuel, 2023-04-23): add a way to pass in additional data
+
 	var buf bytes.Buffer
-	err := tmpl.Execute(&buf, results)
+	err := tmpl.Execute(&buf, data)
 	if err != nil {
 		return "", err
 	}
