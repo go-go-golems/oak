@@ -1,0 +1,5 @@
+ ((call_expression
+          function: (identifier) @function_identifier
+          arguments: (arguments . (_) @first_argument))
+
+      (#eq? @function_identifier "it"))

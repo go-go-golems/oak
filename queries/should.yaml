@@ -1,0 +1,43 @@
+language: javascript
+
+queries:
+  - name: shoulds
+    query: |
+      (call_expression
+        function: (member_expression
+          object: (member_expression
+            property: (property_identifier) @object_property)
+      )
+        arguments: (_) @arguments) @call
+
+      (#eq? @object_property "should")
+  - name: describe
+    query: |
+      (call_expression
+          function: (identifier) @function_identifier
+          arguments: (arguments . (_) @first_argument) 
+      (#eq? @function_identifier "describe"))
+  - name: it
+    query: |
+      (call_expression
+          function: (identifier) @function_identifier
+          arguments: (arguments . (_) @first_argument) 
+      (#eq? @function_identifier "it"))
+
+template: |
+  Write a concise unit test description that can be used as first argument to
+  `describe()` or `it()`, and that matches the following should statements:
+  
+  matches the following should statements:
+  {{ range .shoulds.Matches }}
+  - {{ .call.Text }}{{ end }}
+  
+  Output a single sentence starting with a verb.
+  
+  Then, check if the description matches the following descriptions:
+  {{ range .describe.Matches }}
+  - function `{{ .function_identifier.Text }}`: {{ .first_argument.Text }}{{ end }}
+  {{- range .it.Matches }}
+  - function `{{ .function_identifier.Text }}`: {{ .first_argument.Text }}{{ end }}
+  
+  Answer with YES or NO.

@@ -34,6 +34,7 @@ type Capture struct {
 	Name string
 	// Text is the actual text that was captured
 	Text string
+	Type string
 }
 
 type Match map[string]Capture
@@ -129,13 +130,31 @@ func (cmd *OakCommand) ExecuteQueries(tree *sitter.Node, sourceCode []byte) (Que
 			if !ok {
 				break
 			}
-			m = qc.FilterPredicates(m, sourceCode)
+			if len(m.Captures) == 0 {
+				continue
+			}
 
+			// for debugging purposes
 			match := Match{}
 			for _, c := range m.Captures {
 				match[q.CaptureNameForId(c.Index)] = Capture{
 					Name: q.CaptureNameForId(c.Index),
 					Text: c.Node.Content(sourceCode),
+				}
+			}
+
+			m = FilterPredicates(q, m, sourceCode)
+
+			if len(m.Captures) == 0 {
+				continue
+			}
+
+			match = Match{}
+			for _, c := range m.Captures {
+				match[q.CaptureNameForId(c.Index)] = Capture{
+					Name: q.CaptureNameForId(c.Index),
+					Text: c.Node.Content(sourceCode),
+					Type: c.Node.Type(),
 				}
 			}
 			matches = append(matches, match)

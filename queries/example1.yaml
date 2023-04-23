@@ -1,18 +1,5 @@
 language: go
 
-description: | 
-  This YAML DSL includes:
-  
-  A language field to specify the Tree-sitter language to use.
-  A list of queries, each containing a name for the query and the query itself, written in the Tree-sitter query language.
-  An optional template field that specifies a Go template to render the output of the queries.
-
-  In this example, there are three queries: functionDeclarations, importStatements, and variableDeclarations. Each query is defined as a multi-line string, with the @ symbol used to tag specific nodes for later reference.
-
-  The template field specifies a Go template that uses the range action to iterate over the results of each query, and output them in a structured format.
-
-  You can modify the queries and template as needed to suit your specific use case.
-
 queries:
   - name: functionDeclarations
     query: |
@@ -30,10 +17,6 @@ queries:
           (import_spec
             path: (interpreted_string_literal) @path)
         ]))
-  - name: variableDeclarations
-    query: |
-      (variable_declaration
-        (identifier) @varName)
 
 template: |
   Function Declarations:
@@ -43,8 +26,3 @@ template: |
   Import Statements:
   {{ range .importStatements.Matches }}
   - {{ if .name }}name: {{ .name.Text }}, {{end -}} path: {{ .path.Text }}{{ end }}
-
-  Variable Declarations:
-  {{ range .variableDeclarations }}
-  - Name: {{ .varName.text }}
-  {{ end }}

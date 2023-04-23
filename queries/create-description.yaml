@@ -1,0 +1,21 @@
+language: javascript
+
+queries:
+  - name: shoulds
+    query: |
+      (call_expression
+        function: (member_expression
+          object: (member_expression
+            property: (property_identifier) @object_property)
+      )
+        arguments: (_) @arguments) @call
+
+      (#eq? @object_property "should")
+
+template: |
+  Write a concise unit test description that can be used as first argument to
+  `describe()` or `it()`, and that matches the following should statements:
+  {{ range .shoulds.Matches }}
+  - {{ .call.Text }}{{ end }}
+  
+  Output a single sentence starting with a verb.

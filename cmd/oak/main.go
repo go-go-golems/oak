@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-go-golems/oak/pkg"
 	sitter "github.com/smacker/go-tree-sitter"
 	"github.com/spf13/cobra"
@@ -49,7 +50,7 @@ func main() {
 			}
 			cobra.CheckErr(err)
 
-			println(s)
+			fmt.Println(s)
 		},
 	}
 
@@ -115,7 +116,8 @@ func main() {
 					for _, match := range result.Matches {
 						match_ := map[string]string{}
 						for k, v := range match {
-							match_[k] = v.Text
+							// this really should be glazed output
+							match_[k] = fmt.Sprintf("%s (%s)", v.Text, v.Type)
 						}
 						matches = append(matches, match_)
 					}
