@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/go-go-golems/glazed/pkg/cmds"
 	"github.com/go-go-golems/oak/pkg"
 	sitter "github.com/smacker/go-tree-sitter"
 	"github.com/spf13/cobra"
@@ -12,7 +13,6 @@ import (
 )
 
 func main() {
-	var inputFile string
 	var queryFile string
 	var templateFile string
 
@@ -24,43 +24,47 @@ func main() {
 	runCmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run an oak command against an input file",
+		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			// load queries
 			f, err := os.Open(queryFile)
 			cobra.CheckErr(err)
 
-			oak, err := pkg.NewOakCommandFromReader(f)
+			loader := &pkg.OakCommandLoader{}
+			cmds_, err := loader.LoadCommandFromYAML(f)
 			cobra.CheckErr(err)
-
-			sourceCode, err := readFileOrStdin(inputFile)
-			cobra.CheckErr(err)
-
-			ctx := context.Background()
-			tree, err := oak.Parse(ctx, sourceCode)
-			cobra.CheckErr(err)
-
-			results, err := oak.ExecuteQueries(tree.RootNode(), sourceCode)
-			cobra.CheckErr(err)
-
-			// render template if provided
-			var s string
-			if templateFile != "" {
-				s, err = oak.RenderWithTemplateFile(results, templateFile)
-			} else {
-				s, err = oak.Render(results)
+			if len(cmds_) != 1 {
+				cobra.CheckErr(fmt.Errorf("expected exactly one command"))
 			}
-			cobra.CheckErr(err)
+			oak := cmds_[0].(*pkg.OakCommand)
 
-			fmt.Println(s)
+			for _, inputFile := range args {
+				sourceCode, err := readFileOrStdin(inputFile)
+				cobra.CheckErr(err)
+
+				ctx := context.Background()
+				tree, err := oak.Parse(ctx, sourceCode)
+				cobra.CheckErr(err)
+
+				results, err := oak.ExecuteQueries(tree.RootNode(), oak.Queries, sourceCode)
+				cobra.CheckErr(err)
+
+				// render template if provided
+				var s string
+				if templateFile != "" {
+					s, err = oak.RenderWithTemplateFile(results, templateFile)
+				} else {
+					s, err = oak.Render(results)
+				}
+				cobra.CheckErr(err)
+
+				fmt.Println(s)
+			}
 		},
 	}
 
-	runCmd.Flags().StringVarP(&inputFile, "input-file", "i", "", "Input file path")
-	err := runCmd.MarkFlagRequired("input-file")
-	cobra.CheckErr(err)
-
 	runCmd.Flags().StringVarP(&queryFile, "query-file", "q", "", "SitterQuery file path")
-	err = runCmd.MarkFlagRequired("query-file")
+	err := runCmd.MarkFlagRequired("query-file")
 	cobra.CheckErr(err)
 
 	runCmd.Flags().StringVarP(&templateFile, "template", "t", "", "Template file path")
@@ -68,6 +72,7 @@ func main() {
 	queryCmd := &cobra.Command{
 		Use:   "query",
 		Short: "SitterQuery a source code file with a plain sitter query",
+		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			query, err := readFileOrStdin(queryFile)
 			cobra.CheckErr(err)
@@ -77,62 +82,63 @@ func main() {
 			queryName, err := cmd.Flags().GetString("query-name")
 			cobra.CheckErr(err)
 
-			var lang *sitter.Language
-			if language != "" {
-				lang, err = pkg.LanguageNameToSitterLanguage(language)
-				cobra.CheckErr(err)
-			} else {
-				lang, err = pkg.FileNameToSitterLanguage(inputFile)
-				cobra.CheckErr(err)
-			}
-
-			if queryName == "" {
-				queryName = "main"
-			}
-
-			oak := pkg.NewOakCommand(pkg.WithQueries(pkg.SitterQuery{
-				Name:  queryName,
-				Query: string(query),
-			}),
-				pkg.WithSitterLanguage(lang),
-				pkg.WithTemplate(templateFile))
-
-			sourceCode, err := readFileOrStdin(inputFile)
-			cobra.CheckErr(err)
-
-			ctx := context.Background()
-			tree, err := oak.Parse(ctx, sourceCode)
-			cobra.CheckErr(err)
-
-			results, err := oak.ExecuteQueries(tree.RootNode(), sourceCode)
-			cobra.CheckErr(err)
-
-			// render template if provided
-			if templateFile != "" {
-				s, err := oak.RenderWithTemplateFile(results, templateFile)
-				println(s)
-				cobra.CheckErr(err)
-			} else {
-				matches := []map[string]string{}
-				for _, result := range results {
-					for _, match := range result.Matches {
-						match_ := map[string]string{}
-						for k, v := range match {
-							// this really should be glazed output
-							match_[k] = fmt.Sprintf("%s (%s)", v.Text, v.Type)
-						}
-						matches = append(matches, match_)
-					}
+			for _, inputFile := range args {
+				var lang *sitter.Language
+				if language != "" {
+					lang, err = pkg.LanguageNameToSitterLanguage(language)
+					cobra.CheckErr(err)
+				} else {
+					lang, err = pkg.FileNameToSitterLanguage(inputFile)
+					cobra.CheckErr(err)
 				}
-				err = yaml.NewEncoder(os.Stdout).Encode(matches)
+
+				if queryName == "" {
+					queryName = "main"
+				}
+
+				description := cmds.NewCommandDescription("query")
+
+				oak := pkg.NewOakCommand(description,
+					pkg.WithQueries(pkg.SitterQuery{
+						Name:  queryName,
+						Query: string(query),
+					}),
+					pkg.WithSitterLanguage(lang),
+					pkg.WithTemplate(templateFile))
+
+				sourceCode, err := readFileOrStdin(inputFile)
 				cobra.CheckErr(err)
+
+				ctx := context.Background()
+				tree, err := oak.Parse(ctx, sourceCode)
+				cobra.CheckErr(err)
+
+				results, err := oak.ExecuteQueries(tree.RootNode(), oak.Queries, sourceCode)
+				cobra.CheckErr(err)
+
+				// render template if provided
+				if templateFile != "" {
+					s, err := oak.RenderWithTemplateFile(results, templateFile)
+					println(s)
+					cobra.CheckErr(err)
+				} else {
+					matches := []map[string]string{}
+					for _, result := range results {
+						for _, match := range result.Matches {
+							match_ := map[string]string{}
+							for k, v := range match {
+								// this really should be glazed output
+								match_[k] = fmt.Sprintf("%s (%s)", v.Text, v.Type)
+							}
+							matches = append(matches, match_)
+						}
+					}
+					err = yaml.NewEncoder(os.Stdout).Encode(matches)
+					cobra.CheckErr(err)
+				}
 			}
 		},
 	}
-	queryCmd.Flags().StringVarP(&inputFile, "input-file", "i", "", "Input file path")
-	err = queryCmd.MarkFlagRequired("input-file")
-	cobra.CheckErr(err)
-
 	queryCmd.Flags().StringVarP(&queryFile, "query-file", "q", "", "SitterQuery file path")
 	err = queryCmd.MarkFlagRequired("query-file")
 	cobra.CheckErr(err)
@@ -149,33 +155,35 @@ func main() {
 			language, err := cmd.Flags().GetString("language")
 			cobra.CheckErr(err)
 
-			var lang *sitter.Language
-			if language != "" {
-				lang, err = pkg.LanguageNameToSitterLanguage(language)
+			for _, inputFile := range args {
+
+				var lang *sitter.Language
+				if language != "" {
+					lang, err = pkg.LanguageNameToSitterLanguage(language)
+					cobra.CheckErr(err)
+				} else {
+					lang, err = pkg.FileNameToSitterLanguage(inputFile)
+					cobra.CheckErr(err)
+				}
+
+				description := cmds.NewCommandDescription("parse")
+
+				oak := pkg.NewOakCommand(
+					description,
+					pkg.WithSitterLanguage(lang),
+					pkg.WithTemplate(templateFile))
+
+				sourceCode, err := readFileOrStdin(inputFile)
 				cobra.CheckErr(err)
-			} else {
-				lang, err = pkg.FileNameToSitterLanguage(inputFile)
+
+				ctx := context.Background()
+				tree, err := oak.Parse(ctx, sourceCode)
 				cobra.CheckErr(err)
+
+				oak.DumpTree(tree)
 			}
-
-			oak := pkg.NewOakCommand(
-				pkg.WithSitterLanguage(lang),
-				pkg.WithTemplate(templateFile))
-
-			sourceCode, err := readFileOrStdin(inputFile)
-			cobra.CheckErr(err)
-
-			ctx := context.Background()
-			tree, err := oak.Parse(ctx, sourceCode)
-			cobra.CheckErr(err)
-
-			oak.DumpTree(tree)
 		},
 	}
-
-	parseCmd.Flags().StringVarP(&inputFile, "input-file", "i", "", "Input file path")
-	err = parseCmd.MarkFlagRequired("input-file")
-	cobra.CheckErr(err)
 
 	parseCmd.Flags().String("language", "", "Language name")
 

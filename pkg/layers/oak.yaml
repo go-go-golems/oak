@@ -1,0 +1,13 @@
+slug: oak
+name: Oak flags
+Description: |
+  General purpose flags for oak
+flags:
+  - name: recurse
+    type: bool
+    help: Recurse into subdirectories
+    default: false
+  - name: glazed
+    type: bool
+    help: Output data as glazed table
+    default: false
