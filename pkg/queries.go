@@ -129,7 +129,7 @@ func (oc *OakCommand) RunIntoWriter(
 	ps map[string]interface{},
 	w io.Writer,
 ) error {
-	sources, ok := parsedLayers["oak"].Parameters["sources"]
+	sources, ok := ps["sources"]
 	if !ok {
 		return errors.New("no sources provided")
 	}

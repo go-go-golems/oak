@@ -67,15 +67,22 @@ func (o *OakCommandLoader) LoadCommandFromYAML(
 		return nil, err
 	}
 
+	oakLayer, err := NewOakParameterLayer()
+	if err != nil {
+		return nil, err
+	}
+
+	layers := append(ocd.Layers, oakLayer)
+
 	options_ := []cmds.CommandDescriptionOption{
 		cmds.WithName(ocd.Name),
 		cmds.WithShort(ocd.Short),
 		cmds.WithLong(ocd.Long),
 		cmds.WithFlags(ocd.Flags...),
-		cmds.WithLayers(ocd.Layers...),
+		cmds.WithLayers(layers...),
 		cmds.WithArguments(
 			parameters.NewParameterDefinition(
-				"files",
+				"sources",
 				parameters.ParameterTypeStringList,
 				parameters.WithHelp("Files (or directories if recursing) to parse"),
 				parameters.WithRequired(true),
