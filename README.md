@@ -117,33 +117,15 @@ template: |
 can be run against [test.go](test-inputs/test.go):
 
 ```
-❯ go run ./cmd/oak run --query-file queries/example1.yaml --input-file test-inputs/test.go
-Function Declarations:
+❯ oak example1 ./test-inputs/test.go 
+File: ./test-inputs/test.go
 
-- foo(s string)
-- main()
-- someFunction()
-- printString(s string)
+Function Declarations:
+- foo(s string) 
+- main() 
+- someFunction() 
+- printString(s string) 
 
 Import Statements:
-
 - path: "fmt"
-
-Results:
-  functionDeclarations: 
-     name: foo
-     parameters: (s string)
-  
-     name: main
-     parameters: ()
-  
-     name: someFunction
-     parameters: ()
-  
-     name: printString
-     parameters: (s string)
-  
-  importStatements: 
-     path: "fmt"
 ```
-
