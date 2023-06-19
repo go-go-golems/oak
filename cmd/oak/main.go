@@ -108,10 +108,13 @@ var runCommandCmd = &cobra.Command{
 			cobra.CheckErr(err)
 
 			ctx := context.Background()
-			tree, err := oak.Parse(ctx, sourceCode)
+			tree, err := oak.Parse(ctx, nil, sourceCode)
 			cobra.CheckErr(err)
 
-			results, err := oak.ExecuteQueries(tree.RootNode(), oak.Queries, sourceCode)
+			lang, err := oak.GetLanguage()
+			cobra.CheckErr(err)
+
+			results, err := pkg.ExecuteQueries(lang, tree.RootNode(), oak.Queries, sourceCode)
 			cobra.CheckErr(err)
 
 			s, err := oak.Render(results)
@@ -276,10 +279,15 @@ func registerLegacyCommands() {
 				cobra.CheckErr(err)
 
 				ctx := context.Background()
-				tree, err := oak.Parse(ctx, sourceCode)
+				tree, err := oak.Parse(ctx, nil, sourceCode)
 				cobra.CheckErr(err)
 
-				results, err := oak.ExecuteQueries(tree.RootNode(), oak.Queries, sourceCode)
+				if lang == nil {
+					lang, err = oak.GetLanguage()
+					cobra.CheckErr(err)
+				}
+
+				results, err := pkg.ExecuteQueries(lang, tree.RootNode(), oak.Queries, sourceCode)
 				cobra.CheckErr(err)
 
 				// render template if provided
@@ -343,7 +351,7 @@ func registerLegacyCommands() {
 				cobra.CheckErr(err)
 
 				ctx := context.Background()
-				tree, err := oak.Parse(ctx, sourceCode)
+				tree, err := oak.Parse(ctx, nil, sourceCode)
 				cobra.CheckErr(err)
 
 				oak.DumpTree(tree)

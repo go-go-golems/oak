@@ -192,23 +192,33 @@ func (oc *OakCommand) RunIntoWriter(
 	return nil
 }
 
-func getResultsByFile(ctx context.Context, sources_ []string, oc *OakCommand) (
+// getResultsByFile is a helper function that parses the given fileNames and
+// returns a map of results by fileName.
+func getResultsByFile(
+	ctx context.Context,
+	fileNames []string,
+	oc *OakCommand,
+) (
 	map[string]QueryResults, error) {
 	resultsByFile := map[string]QueryResults{}
 
-	for _, fileName := range sources_ {
+	lang, err := oc.GetLanguage()
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not get language for oak command")
+	}
+
+	for _, fileName := range fileNames {
 		source, err := os.ReadFile(fileName)
 		if err != nil {
 			return nil, errors.Wrapf(err, "could not read file %s", fileName)
 		}
 
-		tree, err := oc.Parse(ctx, []byte(source))
+		tree, err := oc.Parse(ctx, nil, []byte(source))
 		if err != nil {
 			return nil, errors.Wrapf(err, "could not parse file %s", fileName)
 		}
 
-		// TODO(manuel, 2023-04-23) Interpolate the queries
-		results, err := oc.ExecuteQueries(tree.RootNode(), oc.Queries, source)
+		results, err := ExecuteQueries(lang, tree.RootNode(), oc.Queries, source)
 		if err != nil {
 			return nil, errors.Wrapf(err, "could not execute queries for file %s", fileName)
 		}
@@ -221,6 +231,7 @@ func getResultsByFile(ctx context.Context, sources_ []string, oc *OakCommand) (
 
 func (oc *OakCommand) Description() *cmds.CommandDescription {
 	return oc.description
+
 }
 
 func NewOakCommand(d *cmds.CommandDescription, options ...OakCommandOption) *OakCommand {
@@ -238,24 +249,18 @@ func NewOakCommand(d *cmds.CommandDescription, options ...OakCommandOption) *Oak
 // to provide full identifier names when matched.
 //
 // TODO(manuel, 2023-06-19) We only need the language from oc here, right?
-func (oc *OakCommand) ExecuteQueries(
+func ExecuteQueries(
+	lang *sitter.Language,
 	tree *sitter.Node,
 	queries []SitterQuery,
 	sourceCode []byte,
 ) (QueryResults, error) {
-	if oc.SitterLanguage == nil {
-		lang, err := LanguageNameToSitterLanguage(oc.Language)
-		if err != nil {
-			return nil, err
-		}
-		oc.SitterLanguage = lang
-	}
 	results := make(map[string]*Result)
 	for _, query := range queries {
 		matches := []Match{}
 
 		// could parse queries up front and return an error if necessary
-		q, err := sitter.NewQuery([]byte(query.Query), oc.SitterLanguage)
+		q, err := sitter.NewQuery([]byte(query.Query), lang)
 		if err != nil {
 			switch err := err.(type) {
 			case *sitter.QueryError:
@@ -357,19 +362,28 @@ func (oc *OakCommand) ResultsToYAML(results QueryResults, f io.Writer) error {
 	return enc.Encode(results)
 }
 
-func (oc *OakCommand) Parse(ctx context.Context, code []byte) (*sitter.Tree, error) {
+func (oc *OakCommand) GetLanguage() (*sitter.Language, error) {
 	if oc.SitterLanguage == nil {
 		lang, err := LanguageNameToSitterLanguage(oc.Language)
 		if err != nil {
 			return nil, err
 		}
-
 		oc.SitterLanguage = lang
+	}
+	return oc.SitterLanguage, nil
+}
+
+// Parse parses the given code using the language set in the command and returns
+// the resulting tree.
+func (oc *OakCommand) Parse(ctx context.Context, oldTree *sitter.Tree, code []byte) (*sitter.Tree, error) {
+	lang, err := oc.GetLanguage()
+	if err != nil {
+		return nil, err
 	}
 
 	parser := sitter.NewParser()
-	parser.SetLanguage(oc.SitterLanguage)
-	tree, err := parser.ParseCtx(ctx, nil, code)
+	parser.SetLanguage(lang)
+	tree, err := parser.ParseCtx(ctx, oldTree, code)
 	if err != nil {
 		return nil, err
 	}
