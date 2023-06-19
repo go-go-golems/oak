@@ -107,7 +107,7 @@ func initRootCmd() (*help.HelpSystem, error) {
 
 	helpSystem.SetupCobraRootCommand(rootCmd)
 
-	err = clay.InitViper("sqleton", rootCmd)
+	err = clay.InitViper("oak", rootCmd)
 	cobra.CheckErr(err)
 	err = clay.InitLogger()
 	cobra.CheckErr(err)
@@ -119,7 +119,7 @@ func initRootCmd() (*help.HelpSystem, error) {
 func initAllCommands(helpSystem *help.HelpSystem) error {
 	repositories := viper.GetStringSlice("repositories")
 
-	defaultDirectory := "$HOME/.sqleton/queries"
+	defaultDirectory := "$HOME/.oak/queries"
 	_, err := os.Stat(os.ExpandEnv(defaultDirectory))
 	if err == nil {
 		repositories = append(repositories, os.ExpandEnv(defaultDirectory))

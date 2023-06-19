@@ -9,6 +9,7 @@ import (
 	"github.com/go-go-golems/glazed/pkg/cmds/layers"
 	"github.com/go-go-golems/glazed/pkg/helpers/cast"
 	"github.com/go-go-golems/glazed/pkg/helpers/templating"
+	"github.com/go-go-golems/glazed/pkg/processor"
 	"github.com/pkg/errors"
 	sitter "github.com/smacker/go-tree-sitter"
 	"gopkg.in/yaml.v3"
@@ -81,7 +82,7 @@ func (oc *OakCommand) Run(
 	ctx context.Context,
 	parsedLayers map[string]*layers.ParsedParameterLayer,
 	ps map[string]interface{},
-	gp cmds.Processor,
+	gp processor.Processor,
 ) error {
 	sources, ok := parsedLayers["oak"].Parameters["sources"]
 	if !ok {
@@ -111,7 +112,7 @@ func (oc *OakCommand) Run(
 						"type":    capture.Type,
 						"text":    capture.Text,
 					}
-					err = gp.ProcessInputObject(row)
+					err = gp.ProcessInputObject(ctx, row)
 					if err != nil {
 						return err
 					}
