@@ -308,24 +308,26 @@ func printNode(n *sitter.Node, depth int, name string) {
 // WARNING: This is destructive and should only be called once.
 // NOTE(manuel, 2023-06-19) This is not a great API, but it will do for now.
 func (oc *OakCommand) RenderQueries(ps map[string]interface{}) error {
-	for name, _ := range oc.Queries {
-		if oc.Queries[name].rendered {
-			return errors.Errorf("query %s has already been rendered", name)
+	for idx, query := range oc.Queries {
+		// we're ignoring the query because we want the index only, since we are not dealing with pointers
+		_ = query
+		if oc.Queries[idx].rendered {
+			return errors.Errorf("query %s has already been rendered", oc.Queries[idx].Name)
 		}
-		tmpl, err := templating.CreateTemplate("oak").Parse(oc.Queries[name].Query)
+		tmpl, err := templating.CreateTemplate("oak").Parse(oc.Queries[idx].Query)
 		if err != nil {
-			return errors.Wrapf(err, "failed to parse query %s", name)
+			return errors.Wrapf(err, "failed to parse query %s", oc.Queries[idx].Name)
 		}
 		var buf bytes.Buffer
 		err = tmpl.Execute(&buf, ps)
 		if err != nil {
-			return errors.Wrapf(err, "failed to render query %s", name)
+			return errors.Wrapf(err, "failed to render query %s", oc.Queries[idx].Name)
 		}
 
 		query := buf.String()
 
-		oc.Queries[name].Query = query
-		oc.Queries[name].rendered = true
+		oc.Queries[idx].Query = query
+		oc.Queries[idx].rendered = true
 	}
 
 	// remove queries that only consists of whitespace
