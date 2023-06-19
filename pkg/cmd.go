@@ -85,7 +85,7 @@ func (o *OakCommandLoader) LoadCommandFromYAML(
 				"sources",
 				parameters.ParameterTypeStringList,
 				parameters.WithHelp("Files (or directories if recursing) to parse"),
-				parameters.WithRequired(true),
+				parameters.WithRequired(false),
 			),
 		),
 		cmds.WithLayout(&layout.Layout{

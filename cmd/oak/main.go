@@ -190,54 +190,6 @@ func registerLegacyCommands() {
 	var queryFile string
 	var templateFile string
 
-	//runCmd := &cobra.Command{
-	//	Use:   "run",
-	//	Short: "Run an oak command against an input file",
-	//	Args:  cobra.MinimumNArgs(1),
-	//	Run: func(cmd *cobra.Command, args []string) {
-	//		// load queries
-	//		f, err := os.Open(queryFile)
-	//		cobra.CheckErr(err)
-	//
-	//		loader := &pkg.OakCommandLoader{}
-	//		cmds_, err := loader.LoadCommandFromYAML(f)
-	//		cobra.CheckErr(err)
-	//		if len(cmds_) != 1 {
-	//			cobra.CheckErr(fmt.Errorf("expected exactly one command"))
-	//		}
-	//		oak := cmds_[0].(*pkg.OakCommand)
-	//
-	//		for _, inputFile := range args {
-	//			sourceCode, err := readFileOrStdin(inputFile)
-	//			cobra.CheckErr(err)
-	//
-	//			ctx := context.Background()
-	//			tree, err := oak.Parse(ctx, sourceCode)
-	//			cobra.CheckErr(err)
-	//
-	//			results, err := oak.ExecuteQueries(tree.RootNode(), oak.Queries, sourceCode)
-	//			cobra.CheckErr(err)
-	//
-	//			// render template if provided
-	//			var s string
-	//			if templateFile != "" {
-	//				s, err = oak.RenderWithTemplateFile(results, templateFile)
-	//			} else {
-	//				s, err = oak.Render(results)
-	//			}
-	//			cobra.CheckErr(err)
-	//
-	//			fmt.Println(s)
-	//		}
-	//	},
-	//}
-	//
-	//runCmd.Flags().StringVarP(&queryFile, "query-file", "q", "", "SitterQuery file path")
-	//err := runCmd.MarkFlagRequired("query-file")
-	//cobra.CheckErr(err)
-	//
-	//runCmd.Flags().StringVarP(&templateFile, "template", "t", "", "Template file path")
-
 	queryCmd := &cobra.Command{
 		Use:   "query",
 		Short: "SitterQuery a source code file with a plain sitter query",
