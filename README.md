@@ -75,59 +75,19 @@ Import Statements:
 - path: "fmt"
 ```
 
+Commands can be run against whole directories or with explicit globs. For more information, use `oak help glob`.
 
-For example:
-
-```yaml
-language: go
-
-queries:
-  - name: functionDeclarations
-    query: |
-      (function_declaration
-        name: (identifier) @name
-        parameters: (parameter_list) @parameters
-        body: (block))
-  - name: importStatements
-    query: |
-      (import_declaration
-        (import_spec_list [
-          (import_spec
-            (package_identifier) @name
-             path: (interpreted_string_literal) @path)
-          (import_spec
-            path: (interpreted_string_literal) @path)
-        ]))
-
-template: |
-  Function Declarations:
-  {{ range .functionDeclarations.Matches }}
-  - {{ .name.Text }}{{ .parameters.Text }}{{ end }}
-
-  Import Statements:
-  {{ range .importStatements.Matches }}
-  - {{ if .name }}name: {{ .name.Text }}, {{end -}} path: {{ .path.Text }}{{ end }}
-  
-  Results:{{ range $v := .Results }}
-    {{ $v.Name }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
-       {{ $captureName }}: {{ $captureValue.Text }}{{ end }}
-    {{end}}{{ end }}
-```
-
-can be run against [test.go](test-inputs/test.go):
-
-```
-❯ oak example1 ./test-inputs/test.go 
+``` 
+❯ go run ./cmd/oak example1 --glob **/queries.go . ./test-inputs/test.go
 File: ./test-inputs/test.go
 
 Function Declarations:
-- foo(s string) 
-- main() 
-- someFunction() 
-- printString(s string) 
+...
 
-Import Statements:
-- path: "fmt"
+File: pkg/queries.go
+
+Function Declarations:
+...
 ```
 
 ## Rendering the query templates

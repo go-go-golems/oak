@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/go-go-golems/glazed/pkg/cmds"
 	"github.com/go-go-golems/glazed/pkg/cmds/alias"
 	"github.com/go-go-golems/glazed/pkg/cmds/layers"
@@ -19,6 +20,8 @@ import (
 	sitter "github.com/smacker/go-tree-sitter"
 	"gopkg.in/yaml.v3"
 	"io"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"text/template"
@@ -343,6 +346,42 @@ func (oc *OakCommand) RenderQueries(ps map[string]interface{}) error {
 	return nil
 }
 
+func collectSources(sources []string, globs []string) ([]string, error) {
+	if len(globs) == 0 {
+		return sources, nil
+	}
+
+	ret := []string{}
+	// globs not empty implies recursion, if the glob patterns are recursive
+	if len(globs) > 0 {
+		for _, source := range sources {
+			// check if source is a directory
+			fi, err := os.Stat(source)
+			if err != nil {
+				return nil, err
+			}
+			if !fi.IsDir() {
+				ret = append(ret, source)
+			} else {
+				for _, glob := range globs {
+					files, err := doublestar.Glob(os.DirFS(source), glob, doublestar.WithFilesOnly())
+					if err != nil {
+						return nil, err
+					}
+					for _, file := range files {
+						ret = append(ret, filepath.Join(source, file))
+					}
+				}
+			}
+
+		}
+
+		return ret, nil
+	}
+
+	return ret, nil
+}
+
 func (oc *OakCommand) Run(
 	ctx context.Context,
 	parsedLayers map[string]*layers.ParsedParameterLayer,
@@ -377,6 +416,22 @@ func (oc *OakCommand) Run(
 	sources_, ok := cast.CastList2[string, interface{}](sources)
 	if !ok {
 		return errors.New("sources must be a list of strings")
+	}
+
+	recurse := parsedLayers["oak"].Parameters["recurse"].(bool)
+	glob := parsedLayers["oak"].Parameters["glob"]
+	glob_, _ := cast.CastList2[string, interface{}](glob)
+
+	if recurse && len(glob_) == 0 {
+		// use standard globs for the language of the command
+		glob_, err = GetLanguageGlobs(oc.Language)
+		if err != nil {
+			return err
+		}
+	}
+	sources_, err = collectSources(sources_, glob_)
+	if err != nil {
+		return err
 	}
 
 	resultsByFile, err := getResultsByFile(ctx, sources_, oc)
@@ -454,6 +509,22 @@ func (oc *OakCommand) RunIntoWriter(
 	sources_, ok := cast.CastList2[string, interface{}](sources)
 	if !ok {
 		return errors.New("sources must be a list of strings")
+	}
+
+	recurse := parsedLayers["oak"].Parameters["recurse"].(bool)
+	glob := parsedLayers["oak"].Parameters["glob"]
+	glob_, _ := cast.CastList2[string, interface{}](glob)
+
+	if recurse && len(glob_) == 0 {
+		// use standard globs for the language of the command
+		glob_, err = GetLanguageGlobs(oc.Language)
+		if err != nil {
+			return err
+		}
+	}
+	sources_, err = collectSources(sources_, glob_)
+	if err != nil {
+		return err
 	}
 
 	// TODO(manuel, 2023-04-23) Here we need to expand the query templates

@@ -93,6 +93,62 @@ template: |
   {{ end -}}
 ```
 
+## Templated queries
+
+Queries are themselves go templates and will be rendered by passing the flags data from glazed.
+
+You can print the queries to get a preview of what they would look like rendered.
+
+For example, for the following YAML:
+
+```yaml
+name: equals
+short: Find expressions where the right side equals a number.
+flags:
+  - name: number
+    type: int
+    help: The number to compare against
+    default: 1
+language: go
+
+queries:
+  - name: testPredicate
+    query: |
+      (binary_expression
+         left: (_) @left
+         right: (_) @right
+       (#eq? @right {{ .number }}))
+
+template: |
+  {{ range .testPredicate.Matches }}
+  - {{ .left.Text }} - {{.right.Text}}{{ end }}
+
+```
+
+We can either use the default value:
+
+``` 
+❯ oak equals --print-queries
+- name: testPredicate
+  query: |
+    (binary_expression
+       left: (_) @left
+       right: (_) @right
+     (#eq? @right 1))
+```
+
+or provide a custom number:
+
+```
+❯ oak equals --print-queries --number 23 
+- name: testPredicate
+  query: |
+    (binary_expression
+       left: (_) @left
+       right: (_) @right
+     (#eq? @right 23))
+```
+
 ## Command execution
 
 To call the command, run `oak` with the verb path given by the subdirectory structure of the command location
