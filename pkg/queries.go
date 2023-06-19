@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"github.com/go-go-golems/glazed/pkg/cmds"
 	"github.com/go-go-golems/glazed/pkg/cmds/layers"
-	"github.com/go-go-golems/glazed/pkg/cmds/layout"
+	"github.com/go-go-golems/glazed/pkg/helpers/cast"
 	"github.com/go-go-golems/glazed/pkg/helpers/templating"
+	"github.com/go-go-golems/glazed/pkg/processor"
 	"github.com/pkg/errors"
 	sitter "github.com/smacker/go-tree-sitter"
 	"gopkg.in/yaml.v3"
 	"io"
+	"os"
 	"regexp"
 	"strings"
 	"text/template"
@@ -24,7 +26,7 @@ type OakCommand struct {
 	Template string        `yaml:"template"`
 
 	SitterLanguage *sitter.Language
-	description    *OakCommandDescription
+	description    *cmds.CommandDescription
 }
 
 type Capture struct {
@@ -33,6 +35,9 @@ type Capture struct {
 	// Text is the actual text that was captured
 	Text string
 	Type string
+
+	// TODO(manuel, 2023-04-23): Add more information about the capture
+	// for example: offset, line number, filename, query name, ...
 }
 
 type Match map[string]Capture
@@ -40,6 +45,7 @@ type Match map[string]Capture
 type Result struct {
 	// Name is the name of the query
 	Name string
+	// TODO(manuel, 2023-04-23): Add filename
 	// Matches are the matches for the query
 	Matches []Match
 }
@@ -72,65 +78,189 @@ func WithTemplate(template string) OakCommandOption {
 	}
 }
 
-func (cmd *OakCommand) Run(ctx context.Context,
-	parsedLayers map[string]*layers.ParameterLayer,
+func (oc *OakCommand) Run(
+	ctx context.Context,
+	parsedLayers map[string]*layers.ParsedParameterLayer,
 	ps map[string]interface{},
+	gp processor.Processor,
 ) error {
+	sources, ok := parsedLayers["oak"].Parameters["sources"]
+	if !ok {
+		return errors.New("no sources provided")
+	}
+	sources_, ok := cast.CastList2[string, interface{}](sources)
+	if !ok {
+		return errors.New("sources must be a list of strings")
+	}
+
+	// TODO(manuel, 2023-04-23) Here we need to expand the query templates
+	// probably also need to remove empty queries (?)
+
+	resultsByFile, err := getResultsByFile(ctx, sources_, oc)
+	if err != nil {
+		return err
+	}
+
+	for _, fileResults := range resultsByFile {
+		for _, result := range fileResults {
+			for _, match := range result.Matches {
+				for _, capture := range match {
+					row := map[string]interface{}{
+						"file":    fileResults,
+						"query":   result.Name,
+						"capture": capture.Name,
+						"type":    capture.Type,
+						"text":    capture.Text,
+					}
+					err = gp.ProcessInputObject(ctx, row)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
-func (cmd *OakCommand) Description() *cmds.CommandDescription {
-	d := cmd.description
-	return &cmds.CommandDescription{
-		Name:  d.Name,
-		Short: d.Short,
-		Long:  d.Long,
-		Layout: &layout.Layout{
-			Sections: d.Layout,
-		},
-		Flags:     d.Flags,
-		Arguments: d.Arguments,
-		Layers:    d.Layers,
-		Parents:   d.Parents,
-		Source:    d.Source,
+func (oc *OakCommand) RunIntoWriter(
+	ctx context.Context,
+	parsedLayers map[string]*layers.ParsedParameterLayer,
+	ps map[string]interface{},
+	w io.Writer,
+) error {
+	sources, ok := ps["sources"]
+	if !ok {
+		return errors.New("no sources provided")
 	}
-}
+	sources_, ok := cast.CastList2[string, interface{}](sources)
+	if !ok {
+		return errors.New("sources must be a list of strings")
+	}
 
-func NewOakCommandFromReader(r io.Reader, options ...OakCommandOption) (*OakCommand, error) {
-	var cmd OakCommand
-	err := yaml.NewDecoder(r).Decode(&cmd)
+	// TODO(manuel, 2023-04-23) Here we need to expand the query templates
+	// probably also need to remove empty queries (?)
+
+	resultsByFile, err := getResultsByFile(ctx, sources_, oc)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	for _, option := range options {
-		option(&cmd)
+	tmpl, err := templating.CreateTemplate("oak").Parse(oc.Template)
+	if err != nil {
+		return err
 	}
-	return &cmd, nil
+
+	results := QueryResults{}
+
+	for _, fileResults := range resultsByFile {
+		for k, v := range fileResults {
+			result, ok := results[k]
+			if !ok {
+				results[k] = v
+				continue
+			}
+			result.Matches = append(result.Matches, v.Matches...)
+		}
+	}
+
+	data := map[string]interface{}{
+		"ResultsByFile": resultsByFile,
+		"Results":       results,
+	}
+
+	for _, pd := range oc.description.Flags {
+		v, ok := ps[pd.Name]
+		if !ok {
+			continue
+		}
+		data[pd.Name] = v
+	}
+
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, data)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(buf.Bytes())
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func NewOakCommand(options ...OakCommandOption) *OakCommand {
-	cmd := OakCommand{}
+// getResultsByFile is a helper function that parses the given fileNames and
+// returns a map of results by fileName.
+func getResultsByFile(
+	ctx context.Context,
+	fileNames []string,
+	oc *OakCommand,
+) (
+	map[string]QueryResults, error) {
+	resultsByFile := map[string]QueryResults{}
+
+	lang, err := oc.GetLanguage()
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not get language for oak command")
+	}
+
+	for _, fileName := range fileNames {
+		source, err := os.ReadFile(fileName)
+		if err != nil {
+			return nil, errors.Wrapf(err, "could not read file %s", fileName)
+		}
+
+		tree, err := oc.Parse(ctx, nil, []byte(source))
+		if err != nil {
+			return nil, errors.Wrapf(err, "could not parse file %s", fileName)
+		}
+
+		results, err := ExecuteQueries(lang, tree.RootNode(), oc.Queries, source)
+		if err != nil {
+			return nil, errors.Wrapf(err, "could not execute queries for file %s", fileName)
+		}
+
+		resultsByFile[fileName] = results
+	}
+
+	return resultsByFile, nil
+}
+
+func (oc *OakCommand) Description() *cmds.CommandDescription {
+	return oc.description
+
+}
+
+func NewOakCommand(d *cmds.CommandDescription, options ...OakCommandOption) *OakCommand {
+	cmd := OakCommand{
+		description: d,
+	}
 	for _, option := range options {
 		option(&cmd)
 	}
 	return &cmd
 }
 
-func (cmd *OakCommand) ExecuteQueries(tree *sitter.Node, sourceCode []byte) (QueryResults, error) {
-	if cmd.SitterLanguage == nil {
-		lang, err := LanguageNameToSitterLanguage(cmd.Language)
-		if err != nil {
-			return nil, err
-		}
-		cmd.SitterLanguage = lang
-	}
+// ExecuteQueries runs the given queries on the given tree and returns the
+// results. Individual names are resolved using the sourceCode string, so as
+// to provide full identifier names when matched.
+//
+// TODO(manuel, 2023-06-19) We only need the language from oc here, right?
+func ExecuteQueries(
+	lang *sitter.Language,
+	tree *sitter.Node,
+	queries []SitterQuery,
+	sourceCode []byte,
+) (QueryResults, error) {
 	results := make(map[string]*Result)
-	for _, query := range cmd.Queries {
+	for _, query := range queries {
 		matches := []Match{}
 
 		// could parse queries up front and return an error if necessary
-		q, err := sitter.NewQuery([]byte(query.Query), cmd.SitterLanguage)
+		q, err := sitter.NewQuery([]byte(query.Query), lang)
 		if err != nil {
 			switch err := err.(type) {
 			case *sitter.QueryError:
@@ -184,16 +314,16 @@ func (cmd *OakCommand) ExecuteQueries(tree *sitter.Node, sourceCode []byte) (Que
 	return results, nil
 }
 
-func (cmd *OakCommand) Render(results QueryResults) (string, error) {
-	tmpl, err := templating.CreateTemplate("oak").Parse(cmd.Template)
+func (oc *OakCommand) Render(results QueryResults) (string, error) {
+	tmpl, err := templating.CreateTemplate("oak").Parse(oc.Template)
 	if err != nil {
 		return "", err
 	}
 
-	return cmd.RenderWithTemplate(results, tmpl)
+	return oc.RenderWithTemplate(results, tmpl)
 }
 
-func (cmd *OakCommand) RenderWithTemplate(results QueryResults, tmpl *template.Template) (string, error) {
+func (oc *OakCommand) RenderWithTemplate(results QueryResults, tmpl *template.Template) (string, error) {
 	data := map[string]interface{}{
 		"Results": results,
 	}
@@ -213,38 +343,47 @@ func (cmd *OakCommand) RenderWithTemplate(results QueryResults, tmpl *template.T
 	return buf.String(), nil
 }
 
-func (cmd *OakCommand) RenderWithTemplateFile(results QueryResults, file string) (string, error) {
+func (oc *OakCommand) RenderWithTemplateFile(results QueryResults, file string) (string, error) {
 	tmpl, err := templating.CreateTemplate("oak").ParseFiles(file)
 	if err != nil {
 		return "", err
 	}
 
-	return cmd.RenderWithTemplate(results, tmpl)
+	return oc.RenderWithTemplate(results, tmpl)
 }
 
-func (cmd *OakCommand) ResultsToJSON(results QueryResults, f io.Writer) error {
+func (oc *OakCommand) ResultsToJSON(results QueryResults, f io.Writer) error {
 	enc := json.NewEncoder(f)
 	return enc.Encode(results)
 }
 
-func (cmd *OakCommand) ResultsToYAML(results QueryResults, f io.Writer) error {
+func (oc *OakCommand) ResultsToYAML(results QueryResults, f io.Writer) error {
 	enc := yaml.NewEncoder(f)
 	return enc.Encode(results)
 }
 
-func (cmd *OakCommand) Parse(ctx context.Context, code []byte) (*sitter.Tree, error) {
-	if cmd.SitterLanguage == nil {
-		lang, err := LanguageNameToSitterLanguage(cmd.Language)
+func (oc *OakCommand) GetLanguage() (*sitter.Language, error) {
+	if oc.SitterLanguage == nil {
+		lang, err := LanguageNameToSitterLanguage(oc.Language)
 		if err != nil {
 			return nil, err
 		}
+		oc.SitterLanguage = lang
+	}
+	return oc.SitterLanguage, nil
+}
 
-		cmd.SitterLanguage = lang
+// Parse parses the given code using the language set in the command and returns
+// the resulting tree.
+func (oc *OakCommand) Parse(ctx context.Context, oldTree *sitter.Tree, code []byte) (*sitter.Tree, error) {
+	lang, err := oc.GetLanguage()
+	if err != nil {
+		return nil, err
 	}
 
 	parser := sitter.NewParser()
-	parser.SetLanguage(cmd.SitterLanguage)
-	tree, err := parser.ParseCtx(ctx, nil, code)
+	parser.SetLanguage(lang)
+	tree, err := parser.ParseCtx(ctx, oldTree, code)
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +412,7 @@ func (cmd *OakCommand) Parse(ctx context.Context, code []byte) (*sitter.Tree, er
 //	            type: type_identifier [15-18]
 //
 // The recursive cursor walker from the documentation didn't seem to work, at least on the hcl file.
-func (cmd *OakCommand) DumpTree(tree *sitter.Tree) {
+func (oc *OakCommand) DumpTree(tree *sitter.Tree) {
 	var visit2 func(n *sitter.Node, name string, depth int)
 	visit2 = func(n *sitter.Node, name string, depth int) {
 		printNode(n, depth, name)
@@ -306,19 +445,4 @@ func printNode(n *sitter.Node, depth int, name string) {
 		fmt.Printf("%s%s%s [%d-%d]\n", strings.Repeat("  ", depth), prefix, s, n.StartByte(), n.EndByte())
 
 	}
-}
-
-type OakGlazeCommand struct {
-	*OakCommand
-}
-
-func (c *OakGlazeCommand) Run(
-	ctx context.Context,
-	parsedLayers map[string]*layers.ParsedParameterLayer,
-	ps map[string]interface{},
-	gp cmds.Processor,
-) error {
-
-	return nil
-
 }

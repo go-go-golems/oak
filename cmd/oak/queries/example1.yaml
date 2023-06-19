@@ -1,0 +1,50 @@
+name: example1
+short: A simple example to extract go imports and functions from a go file
+
+flags:
+  - name: verbose
+    type: bool
+    help: Output all results
+    default: false
+
+language: go
+queries:
+  - name: functionDeclarations
+    query: |
+      (function_declaration
+        name: (identifier) @name
+        parameters: (parameter_list) @parameters
+        body: (block))
+  - name: importStatements
+    query: |
+      (import_declaration
+        (import_spec_list [
+          (import_spec
+            (package_identifier) @name
+             path: (interpreted_string_literal) @path)
+          (import_spec
+            path: (interpreted_string_literal) @path)
+        ]))
+
+template: |
+  {{ range $file, $results := .ResultsByFile -}}
+  File: {{ $file }}
+  
+  {{ with $results -}}
+  Function Declarations:
+  {{- range .functionDeclarations.Matches }}
+  - {{ .name.Text }}{{ .parameters.Text }} {{ end }}
+
+  Import Statements:
+  {{ range .importStatements.Matches -}}
+  - {{ if .name }}name: {{ .name.Text }}, {{end -}} path: {{ .path.Text }}
+  {{ end }}
+  {{ end -}}
+  {{ end -}}
+  
+  {{ if .verbose -}}
+  Results:{{ range $v := .Results }}
+    {{ $v.Name }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
+       {{ $captureName }}: {{ $captureValue.Text }}{{ end }}
+    {{end}}{{ end }}
+  {{ end -}}
