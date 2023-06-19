@@ -36,6 +36,11 @@ Use tree-sitter to run queries against programming language files.
 
 ## Overview
 
+Oak allows the user to provide [tree-sitter](https://tree-sitter.github.io/tree-sitter/) queries
+in a YAML file and use the resulting captures to expand a go template.
+
+## Background
+
 When prompting LLMs for programming, it is very useful to provide some context about
 the code that you want to generate, for example out of your current codebase.
 
@@ -46,8 +51,30 @@ which follows the pattern of tools like [glaze](https://github.com/go-go-golems/
 [sqleton](https://github.com/go-go-golems/sqleton) or [pinocchio](https://github.com/go-go-golems/geppetto)
 which allow the user to declare "commands" in a YAML file.
 
-Oak allows the user to provide [tree-sitter](https://tree-sitter.github.io/tree-sitter/) queries
-in a YAML file and use the resulting captures to expand a go template.
+## Getting started
+
+After installing oak by downloading the proper release binary, you can start creating oak commands
+by storing them in your command repository (a directory containing all your oak queries).
+
+To get started, use `oak help create-query` to get an introduction to creating a new verb.
+
+You can also run [example1](./cmd/oak/queries/example1.yaml) against [a go file](./test-inputs/test.go)
+to get a list of imports and function declarations.
+
+```
+❯ oak example1 ./test-inputs/test.go
+File: ./test-inputs/test.go
+
+Function Declarations:
+- foo(s string) 
+- main() 
+- someFunction() 
+- printString(s string) 
+
+Import Statements:
+- path: "fmt"
+```
+
 
 For example:
 
@@ -120,34 +147,3 @@ Results:
      path: "fmt"
 ```
 
-## Brainstorming (2023-04-22)
-
-Today I want to:
-
-- [x] run queries against a file to understand how queries work
-
-- [x] figure out how to filter query results to only return interesting
-- [x] query against a terraform
-- [] list supported languages
-
-- [x] file pull request for the predicate fix (see https://github.com/smacker/go-tree-sitter/pull/102).
-
-## Turn OakCommand into a glazed.Command
-
-We have multiple ways of doing it:
-- output templated structured data
-- output a template
-- output a straight list of capture data
-
-Furthermore, we should make the queries templates that are expanded based on the input flags.
-Also, exposing it as a verb means that we have to somehow give the whole thing the input files (as list?).
-
-We can add those input file and language flags as a separate layer (also, --template, potentially multiple output files
-for multiple input files).
-
-I'm not sure how to do the structured templated output.
-
-## Misc improvements
-
-- add SQL grammar for tree-sitter, as well as anything else we might need
-  - see https://github.com/smacker/go-tree-sitter/pull/58/files and https://github.com/smacker/go-tree-sitter/issues/57
