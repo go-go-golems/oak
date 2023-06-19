@@ -88,9 +88,37 @@ func main() {
 var runCommandCmd = &cobra.Command{
 	Use:   "run-command",
 	Short: "Run a command from a file",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		panic(fmt.Errorf("not implemented"))
+		queryFile := args[0]
+		// load queries
+		f, err := os.Open(queryFile)
+		cobra.CheckErr(err)
+
+		loader := &pkg.OakCommandLoader{}
+		cmds_, err := loader.LoadCommandFromYAML(f)
+		cobra.CheckErr(err)
+		if len(cmds_) != 1 {
+			cobra.CheckErr(fmt.Errorf("expected exactly one command"))
+		}
+		oak := cmds_[0].(*pkg.OakCommand)
+
+		for _, inputFile := range args[1:] {
+			sourceCode, err := readFileOrStdin(inputFile)
+			cobra.CheckErr(err)
+
+			ctx := context.Background()
+			tree, err := oak.Parse(ctx, sourceCode)
+			cobra.CheckErr(err)
+
+			results, err := oak.ExecuteQueries(tree.RootNode(), oak.Queries, sourceCode)
+			cobra.CheckErr(err)
+
+			s, err := oak.Render(results)
+			cobra.CheckErr(err)
+
+			fmt.Println(s)
+		}
 	},
 }
 
