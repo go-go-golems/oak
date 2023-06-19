@@ -7,7 +7,7 @@ flags:
     type: bool
     help: Recurse into subdirectories
     default: false
-  - name: glazed
+  - name: print-queries
     type: bool
-    help: Output data as glazed table
+    help: Print queries
     default: false

@@ -124,12 +124,32 @@ func (oc *OakCommand) Run(
 	return nil
 }
 
+// indentLines is a helper function that will prepend the given prefix in front of each line
+// in s. This is useful when outputting things as a literal string in YAML.
+func indentLines(s string, prefix string) string {
+	return prefix + strings.ReplaceAll(s, "\n", "\n"+prefix)
+}
+
 func (oc *OakCommand) RunIntoWriter(
 	ctx context.Context,
 	parsedLayers map[string]*layers.ParsedParameterLayer,
 	ps map[string]interface{},
 	w io.Writer,
 ) error {
+	printQueries, ok := ps["print-queries"]
+	if ok && printQueries.(bool) {
+		for _, query := range oc.Queries {
+			_, err := fmt.Fprintf(
+				w, "- name: %s\n  query: |\n%s",
+				query.Name,
+				indentLines(query.Query, "    "))
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	sources, ok := ps["sources"]
 	if !ok {
 		return errors.New("no sources provided")
