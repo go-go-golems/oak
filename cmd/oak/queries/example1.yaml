@@ -27,6 +27,9 @@ queries:
         ]))
 
 template: |
+  {{ range $file, $results := .ResultsByFile -}}
+  File: {{ $file }}
+  {{ with $results -}}
   Function Declarations:
   {{ range .functionDeclarations.Matches }}
   - {{ .name.Text }}{{ .parameters.Text }}{{ end }}
@@ -40,4 +43,6 @@ template: |
     {{ $v.Name }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
        {{ $captureName }}: {{ $captureValue.Text }}{{ end }}
     {{end}}{{ end }}
+  {{ end -}}
+  {{ end -}}
   {{ end -}}
