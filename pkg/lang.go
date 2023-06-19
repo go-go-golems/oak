@@ -135,6 +135,22 @@ var (
 	}
 )
 
+func GetLanguageGlobs(lang string) ([]string, error) {
+	ret := []string{}
+
+	for filename, lang_ := range fileEndingToLanguageName {
+		if lang_ == lang {
+			ret = append(ret, fmt.Sprintf("**/%s", filename))
+		}
+	}
+
+	if len(ret) == 0 {
+		return nil, fmt.Errorf("unsupported language name: %s", lang)
+	} else {
+		return ret, nil
+	}
+}
+
 func FileNameToSitterLanguage(filename string) (*sitter.Language, error) {
 	baseName := path.Base(filename)
 	for ending, name := range fileEndingToLanguageName {

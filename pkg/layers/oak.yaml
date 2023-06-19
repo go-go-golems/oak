@@ -11,3 +11,6 @@ flags:
     type: bool
     help: Print queries
     default: false
+  - name: glob
+    type: stringList
+    help: Glob patterns to match files
