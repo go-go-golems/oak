@@ -233,6 +233,11 @@ func NewOakCommand(d *cmds.CommandDescription, options ...OakCommandOption) *Oak
 	return &cmd
 }
 
+// ExecuteQueries runs the given queries on the given tree and returns the
+// results. Individual names are resolved using the sourceCode string, so as
+// to provide full identifier names when matched.
+//
+// TODO(manuel, 2023-06-19) We only need the language from oc here, right?
 func (oc *OakCommand) ExecuteQueries(
 	tree *sitter.Node,
 	queries []SitterQuery,
