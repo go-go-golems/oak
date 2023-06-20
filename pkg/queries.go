@@ -22,20 +22,22 @@ type Capture struct {
 	Name string
 	// Text is the actual text that was captured
 	Text string
+	// Type is the Treesitter type of the captured node
 	Type string
 
 	// TODO(manuel, 2023-04-23): Add more information about the capture
 	// for example: offset, line number, filename, query name, ...
+	StartByte  uint32
+	EndByte    uint32
+	StartPoint sitter.Point
+	EndPoint   sitter.Point
 }
 
 type Match map[string]Capture
 
 type Result struct {
-	// Name is the name of the query
-	Name string
-	// TODO(manuel, 2023-04-23): Add filename
-	// Matches are the matches for the query
-	Matches []Match
+	QueryName string
+	Matches   []Match
 }
 
 type QueryResults map[string]*Result
@@ -116,8 +118,12 @@ func ExecuteQueries(
 			match := Match{}
 			for _, c := range m.Captures {
 				match[q.CaptureNameForId(c.Index)] = Capture{
-					Name: q.CaptureNameForId(c.Index),
-					Text: c.Node.Content(sourceCode),
+					Name:       q.CaptureNameForId(c.Index),
+					Text:       c.Node.Content(sourceCode),
+					StartByte:  c.Node.StartByte(),
+					EndByte:    c.Node.EndByte(),
+					StartPoint: c.Node.StartPoint(),
+					EndPoint:   c.Node.EndPoint(),
 				}
 			}
 
@@ -130,17 +136,21 @@ func ExecuteQueries(
 			match = Match{}
 			for _, c := range m.Captures {
 				match[q.CaptureNameForId(c.Index)] = Capture{
-					Name: q.CaptureNameForId(c.Index),
-					Text: c.Node.Content(sourceCode),
-					Type: c.Node.Type(),
+					Name:       q.CaptureNameForId(c.Index),
+					Text:       c.Node.Content(sourceCode),
+					Type:       c.Node.Type(),
+					StartByte:  c.Node.StartByte(),
+					EndByte:    c.Node.EndByte(),
+					StartPoint: c.Node.StartPoint(),
+					EndPoint:   c.Node.EndPoint(),
 				}
 			}
 			matches = append(matches, match)
 		}
 
 		results[query.Name] = &Result{
-			Name:    query.Name,
-			Matches: matches,
+			QueryName: query.Name,
+			Matches:   matches,
 		}
 	}
 
