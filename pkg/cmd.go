@@ -16,6 +16,7 @@ import (
 	"github.com/go-go-golems/glazed/pkg/helpers/cast"
 	"github.com/go-go-golems/glazed/pkg/helpers/templating"
 	"github.com/go-go-golems/glazed/pkg/processor"
+	"github.com/go-go-golems/glazed/pkg/settings"
 	"github.com/pkg/errors"
 	sitter "github.com/smacker/go-tree-sitter"
 	"gopkg.in/yaml.v3"
@@ -114,7 +115,7 @@ func (o *OakCommandLoader) LoadCommandFromYAML(
 	}
 	options_ = append(options_, options...)
 
-	oakCommand := NewOakCommand(
+	oakCommand := NewOakWriterCommand(
 		cmds.NewCommandDescription(ocd.Name, options_...),
 		WithQueries(ocd.Queries...),
 		WithTemplate(ocd.Template),
@@ -133,17 +134,6 @@ func (o *OakCommandLoader) LoadCommandAliasFromYAML(
 
 func (oc *OakCommand) Description() *cmds.CommandDescription {
 	return oc.description
-
-}
-
-func NewOakCommand(d *cmds.CommandDescription, options ...OakCommandOption) *OakCommand {
-	cmd := OakCommand{
-		description: d,
-	}
-	for _, option := range options {
-		option(&cmd)
-	}
-	return &cmd
 }
 
 type OakCommandOption func(*OakCommand)
@@ -382,86 +372,6 @@ func collectSources(sources []string, globs []string) ([]string, error) {
 	return ret, nil
 }
 
-func (oc *OakCommand) Run(
-	ctx context.Context,
-	parsedLayers map[string]*layers.ParsedParameterLayer,
-	ps map[string]interface{},
-	gp processor.Processor,
-) error {
-	err := oc.RenderQueries(ps)
-	if err != nil {
-		return err
-	}
-
-	printQueries, ok := ps["print-queries"]
-	if ok && printQueries.(bool) {
-		for _, q := range oc.Queries {
-			v := map[string]interface{}{
-				"query": q.Query,
-				"name":  q.Name,
-			}
-			err := gp.ProcessInputObject(ctx, v)
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	}
-
-	sources, ok := parsedLayers["oak"].Parameters["sources"]
-	if !ok {
-		return errors.New("no sources provided")
-	}
-	sources_, ok := cast.CastList2[string, interface{}](sources)
-	if !ok {
-		return errors.New("sources must be a list of strings")
-	}
-
-	recurse := parsedLayers["oak"].Parameters["recurse"].(bool)
-	glob := parsedLayers["oak"].Parameters["glob"]
-	glob_, _ := cast.CastList2[string, interface{}](glob)
-
-	if recurse && len(glob_) == 0 {
-		// use standard globs for the language of the command
-		glob_, err = GetLanguageGlobs(oc.Language)
-		if err != nil {
-			return err
-		}
-	}
-	sources_, err = collectSources(sources_, glob_)
-	if err != nil {
-		return err
-	}
-
-	resultsByFile, err := getResultsByFile(ctx, sources_, oc)
-	if err != nil {
-		return err
-	}
-
-	for _, fileResults := range resultsByFile {
-		for _, result := range fileResults {
-			for _, match := range result.Matches {
-				for _, capture := range match {
-					row := map[string]interface{}{
-						"file":    fileResults,
-						"query":   result.Name,
-						"capture": capture.Name,
-						"type":    capture.Type,
-						"text":    capture.Text,
-					}
-					err = gp.ProcessInputObject(ctx, row)
-					if err != nil {
-						return err
-					}
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
 // indentLines is a helper function that will prepend the given prefix in front of each line
 // in s. This is useful when outputting things as a literal string in YAML.
 func indentLines(s string, prefix string) string {
@@ -482,7 +392,23 @@ func (oc *OakCommand) PrintQueries(w io.Writer) error {
 	return nil
 }
 
-func (oc *OakCommand) RunIntoWriter(
+type OakWriterCommand struct {
+	*OakCommand
+}
+
+func NewOakWriterCommand(d *cmds.CommandDescription, options ...OakCommandOption) *OakWriterCommand {
+	cmd := OakWriterCommand{
+		OakCommand: &OakCommand{
+			description: d,
+		},
+	}
+	for _, option := range options {
+		option(cmd.OakCommand)
+	}
+	return &cmd
+}
+
+func (oc *OakWriterCommand) RunIntoWriter(
 	ctx context.Context,
 	parsedLayers map[string]*layers.ParsedParameterLayer,
 	ps map[string]interface{},
@@ -530,7 +456,7 @@ func (oc *OakCommand) RunIntoWriter(
 	// TODO(manuel, 2023-04-23) Here we need to expand the query templates
 	// probably also need to remove empty queries (?)
 
-	resultsByFile, err := getResultsByFile(ctx, sources_, oc)
+	resultsByFile, err := getResultsByFile(ctx, sources_, oc.OakCommand)
 	if err != nil {
 		return err
 	}
@@ -578,4 +504,161 @@ func (oc *OakCommand) RunIntoWriter(
 	}
 
 	return nil
+}
+
+type OakGlazedCommand struct {
+	*OakCommand
+}
+
+func (oc *OakGlazedCommand) Run(
+	ctx context.Context,
+	parsedLayers map[string]*layers.ParsedParameterLayer,
+	ps map[string]interface{},
+	gp processor.Processor,
+) error {
+	err := oc.RenderQueries(ps)
+	if err != nil {
+		return err
+	}
+
+	printQueries, ok := ps["print-queries"]
+	if ok && printQueries.(bool) {
+		for _, q := range oc.Queries {
+			v := map[string]interface{}{
+				"query": q.Query,
+				"name":  q.Name,
+			}
+			err := gp.ProcessInputObject(ctx, v)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	sources, ok := ps["sources"]
+	if !ok {
+		return errors.New("no sources provided")
+	}
+	sources_, ok := cast.CastList2[string, interface{}](sources)
+	if !ok {
+		return errors.New("sources must be a list of strings")
+	}
+
+	recurse := parsedLayers["oak"].Parameters["recurse"].(bool)
+	glob := parsedLayers["oak"].Parameters["glob"]
+	glob_, _ := cast.CastList2[string, interface{}](glob)
+
+	if recurse && len(glob_) == 0 {
+		// use standard globs for the language of the command
+		glob_, err = GetLanguageGlobs(oc.Language)
+		if err != nil {
+			return err
+		}
+	}
+	sources_, err = collectSources(sources_, glob_)
+	if err != nil {
+		return err
+	}
+
+	resultsByFile, err := getResultsByFile(ctx, sources_, oc.OakCommand)
+	if err != nil {
+		return err
+	}
+
+	for fileName, fileResults := range resultsByFile {
+		for _, result := range fileResults {
+			for _, match := range result.Matches {
+				for _, capture := range match {
+					row := map[string]interface{}{
+						"file":    fileName,
+						"query":   result.Name,
+						"capture": capture.Name,
+						"type":    capture.Type,
+						"text":    capture.Text,
+					}
+					err = gp.ProcessInputObject(ctx, row)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+	gp.OutputFormatter().SetColumnOrder([]string{"file", "query", "capture", "type", "text"})
+
+	return nil
+}
+
+func NewOakGlazedCommand(d *cmds.CommandDescription, options ...OakCommandOption) *OakGlazedCommand {
+	cmd := OakGlazedCommand{
+		OakCommand: &OakCommand{
+			description: d,
+		},
+	}
+	for _, option := range options {
+		option(cmd.OakCommand)
+	}
+	return &cmd
+}
+
+type OakGlazedCommandLoader struct{}
+
+func (o *OakGlazedCommandLoader) LoadCommandFromYAML(
+	s io.Reader,
+	options ...cmds.CommandDescriptionOption,
+) ([]cmds.Command, error) {
+	ocd := &OakCommandDescription{}
+	err := yaml.NewDecoder(s).Decode(ocd)
+	if err != nil {
+		return nil, err
+	}
+
+	oakLayer, err := NewOakParameterLayer()
+	if err != nil {
+		return nil, err
+	}
+
+	glazeLayer, err := settings.NewGlazedParameterLayers()
+	if err != nil {
+		return nil, err
+	}
+	layers := append(ocd.Layers, glazeLayer, oakLayer)
+
+	options_ := []cmds.CommandDescriptionOption{
+		cmds.WithName(ocd.Name),
+		cmds.WithShort(ocd.Short),
+		cmds.WithLong(ocd.Long),
+		cmds.WithFlags(ocd.Flags...),
+		cmds.WithLayers(layers...),
+		cmds.WithArguments(
+			parameters.NewParameterDefinition(
+				"sources",
+				parameters.ParameterTypeStringList,
+				parameters.WithHelp("Files (or directories if recursing) to parse"),
+				parameters.WithRequired(false),
+			),
+		),
+		cmds.WithLayout(&layout.Layout{
+			Sections: ocd.Layout,
+		}),
+	}
+	options_ = append(options_, options...)
+
+	oakCommand := NewOakGlazedCommand(
+		cmds.NewCommandDescription(ocd.Name, options_...),
+		WithQueries(ocd.Queries...),
+		WithTemplate(ocd.Template),
+		WithLanguage(ocd.Language),
+	)
+
+	return []cmds.Command{oakCommand}, nil
+}
+
+func (o *OakGlazedCommandLoader) LoadCommandAliasFromYAML(
+	s io.Reader,
+	options ...alias.Option,
+) ([]*alias.CommandAlias, error) {
+	return loaders.LoadCommandAliasFromYAML(s, options...)
 }
