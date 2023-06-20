@@ -573,10 +573,19 @@ func (oc *OakGlazedCommand) Run(
 				for _, capture := range match {
 					row := map[string]interface{}{
 						"file":    fileName,
-						"query":   result.Name,
+						"query":   result.QueryName,
 						"capture": capture.Name,
-						"type":    capture.Type,
-						"text":    capture.Text,
+
+						"startRow":    capture.StartPoint.Row,
+						"startColumn": capture.StartPoint.Column,
+						"endRow":      capture.EndPoint.Row,
+						"endColumn":   capture.EndPoint.Column,
+
+						"startByte": capture.StartByte,
+						"endByte":   capture.EndByte,
+
+						"type": capture.Type,
+						"text": capture.Text,
 					}
 					err = gp.ProcessInputObject(ctx, row)
 					if err != nil {
