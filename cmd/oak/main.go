@@ -183,6 +183,25 @@ func initAllCommands(helpSystem *help.HelpSystem) error {
 		os.Exit(1)
 	}
 
+	glazeCmd := &cobra.Command{
+		Use:   "glaze",
+		Short: "Run commands and output results as structured data",
+	}
+	rootCmd.AddCommand(glazeCmd)
+
+	oakGlazedLoader := &pkg.OakGlazedCommandLoader{}
+	yamlFSLoader = loaders.NewYAMLFSCommandLoader(oakGlazedLoader)
+	commands, aliases, err = commandLoader.LoadCommands(yamlFSLoader, helpSystem)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Error initializing commands: %s\n", err)
+		os.Exit(1)
+	}
+
+	err = cli.AddCommandsToRootCommand(glazeCmd, commands, aliases)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Error initializing commands: %s\n", err)
+		os.Exit(1)
+	}
 	return nil
 }
 
@@ -219,7 +238,7 @@ func registerLegacyCommands() {
 
 				description := cmds.NewCommandDescription("query")
 
-				oak := pkg.NewOakCommand(description,
+				oak := pkg.NewOakWriterCommand(description,
 					pkg.WithQueries(pkg.SitterQuery{
 						Name:  queryName,
 						Query: string(query),
@@ -294,7 +313,7 @@ func registerLegacyCommands() {
 
 				description := cmds.NewCommandDescription("parse")
 
-				oak := pkg.NewOakCommand(
+				oak := pkg.NewOakWriterCommand(
 					description,
 					pkg.WithSitterLanguage(lang),
 					pkg.WithTemplate(templateFile))
