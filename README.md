@@ -78,7 +78,7 @@ Import Statements:
 Commands can be run against whole directories or with explicit globs. For more information, use `oak help glob`.
 
 ``` 
-❯ go run ./cmd/oak example1 --glob **/queries.go . ./test-inputs/test.go
+❯ oak example1 --glob **/queries.go . ./test-inputs/test.go
 File: ./test-inputs/test.go
 
 Function Declarations:
