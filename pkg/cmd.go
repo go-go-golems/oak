@@ -17,6 +17,7 @@ import (
 	"github.com/go-go-golems/glazed/pkg/helpers/templating"
 	"github.com/go-go-golems/glazed/pkg/processor"
 	"github.com/go-go-golems/glazed/pkg/settings"
+	"github.com/go-go-golems/glazed/pkg/types"
 	"github.com/pkg/errors"
 	sitter "github.com/smacker/go-tree-sitter"
 	"gopkg.in/yaml.v3"
@@ -514,7 +515,7 @@ func (oc *OakGlazedCommand) Run(
 	ctx context.Context,
 	parsedLayers map[string]*layers.ParsedParameterLayer,
 	ps map[string]interface{},
-	gp processor.Processor,
+	gp processor.TableProcessor,
 ) error {
 	err := oc.RenderQueries(ps)
 	if err != nil {
@@ -524,11 +525,11 @@ func (oc *OakGlazedCommand) Run(
 	printQueries, ok := ps["print-queries"]
 	if ok && printQueries.(bool) {
 		for _, q := range oc.Queries {
-			v := map[string]interface{}{
-				"query": q.Query,
-				"name":  q.Name,
-			}
-			err := gp.ProcessInputObject(ctx, v)
+			v := types.NewRow(
+				types.MRP("query", q.Query),
+				types.MRP("name", q.Name),
+			)
+			err := gp.AddRow(ctx, v)
 			if err != nil {
 				return err
 			}
@@ -571,23 +572,23 @@ func (oc *OakGlazedCommand) Run(
 		for _, result := range fileResults {
 			for _, match := range result.Matches {
 				for _, capture := range match {
-					row := map[string]interface{}{
-						"file":    fileName,
-						"query":   result.QueryName,
-						"capture": capture.Name,
+					row := types.NewRow(
+						types.MRP("file", fileName),
+						types.MRP("query", result.QueryName),
+						types.MRP("capture", capture.Name),
 
-						"startRow":    capture.StartPoint.Row,
-						"startColumn": capture.StartPoint.Column,
-						"endRow":      capture.EndPoint.Row,
-						"endColumn":   capture.EndPoint.Column,
+						types.MRP("startRow", capture.StartPoint.Row),
+						types.MRP("startColumn", capture.StartPoint.Column),
+						types.MRP("endRow", capture.EndPoint.Row),
+						types.MRP("endColumn", capture.EndPoint.Column),
 
-						"startByte": capture.StartByte,
-						"endByte":   capture.EndByte,
+						types.MRP("startByte", capture.StartByte),
+						types.MRP("endByte", capture.EndByte),
 
-						"type": capture.Type,
-						"text": capture.Text,
-					}
-					err = gp.ProcessInputObject(ctx, row)
+						types.MRP("type", capture.Type),
+						types.MRP("text", capture.Text),
+					)
+					err = gp.AddRow(ctx, row)
 					if err != nil {
 						return err
 					}
@@ -595,7 +596,6 @@ func (oc *OakGlazedCommand) Run(
 			}
 		}
 	}
-	gp.OutputFormatter().SetColumnOrder([]string{"file", "query", "capture", "type", "text"})
 
 	return nil
 }
