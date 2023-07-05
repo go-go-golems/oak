@@ -4,8 +4,8 @@ go 1.19
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.6.0
-	github.com/go-go-golems/clay v0.0.17
-	github.com/go-go-golems/glazed v0.3.0
+	github.com/go-go-golems/clay v0.0.18
+	github.com/go-go-golems/glazed v0.3.6
 	github.com/pkg/errors v0.9.1
 	github.com/smacker/go-tree-sitter v0.0.0-20230415045416-af16b1008751
 	github.com/spf13/cobra v1.7.0
@@ -77,7 +77,6 @@ require (
 	go.mongodb.org/mongo-driver v1.11.3 // indirect
 	golang.org/x/crypto v0.5.0 // indirect
 	golang.org/x/net v0.5.0 // indirect
-	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/text v0.6.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
