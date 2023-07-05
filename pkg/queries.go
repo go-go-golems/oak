@@ -117,8 +117,9 @@ func ExecuteQueries(
 			// for debugging purposes
 			match := Match{}
 			for _, c := range m.Captures {
-				match[q.CaptureNameForId(c.Index)] = Capture{
-					Name:       q.CaptureNameForId(c.Index),
+				name := q.CaptureNameForId(c.Index)
+				match[name] = Capture{
+					Name:       name,
 					Text:       c.Node.Content(sourceCode),
 					StartByte:  c.Node.StartByte(),
 					EndByte:    c.Node.EndByte(),
@@ -135,9 +136,22 @@ func ExecuteQueries(
 
 			match = Match{}
 			for _, c := range m.Captures {
-				match[q.CaptureNameForId(c.Index)] = Capture{
-					Name:       q.CaptureNameForId(c.Index),
-					Text:       c.Node.Content(sourceCode),
+				name := q.CaptureNameForId(c.Index)
+				content := string(sourceCode[c.Node.StartByte():c.Node.EndByte()])
+				if m, ok := match[name]; ok {
+					match[name] = Capture{
+						Name:       name,
+						Text:       m.Text + "\n" + content,
+						StartByte:  m.StartByte,
+						EndByte:    c.Node.EndByte(),
+						StartPoint: m.StartPoint,
+						EndPoint:   c.Node.EndPoint(),
+					}
+					continue
+				}
+				match[name] = Capture{
+					Name:       name,
+					Text:       content,
 					Type:       c.Node.Type(),
 					StartByte:  c.Node.StartByte(),
 					EndByte:    c.Node.EndByte(),
