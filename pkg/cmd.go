@@ -454,9 +454,6 @@ func (oc *OakWriterCommand) RunIntoWriter(
 		return err
 	}
 
-	// TODO(manuel, 2023-04-23) Here we need to expand the query templates
-	// probably also need to remove empty queries (?)
-
 	resultsByFile, err := getResultsByFile(ctx, sources_, oc.OakCommand)
 	if err != nil {
 		return err

@@ -6,42 +6,65 @@ flags:
     type: bool
     help: Output all results
     default: false
+  - name: type
+    type: string
+    help: Only output methods and types matching type
 
 language: go
 queries:
   - name: structDeclarations
     query: |
-      ((comment)* @comment .
+      (
+       (comment)* @comment .
        (type_declaration
         (type_spec
           name: (type_identifier) @structName
-          type: (struct_type) @structBody)))
+          type: (struct_type) @structBody))
+        {{ if .type }}(#eq? @structName "{{.type}}"){{end}}
+      )
 
   - name: interfaceDeclarations
     query: |
+      {{ if not .type }}
       ((comment)* @comment .
-      (type_declaration
+       (type_declaration
         (type_spec
           name: (type_identifier) @interfaceName
-          type: (interface_type) @interfaceBody)))
+          type: (interface_type) @interfaceBody))
+        {{ if .type }}(#eq? @interfaceName "{{.type}}"){{end}}
+      )
+      {{ end}}
 
   - name: functionDeclarations
     query: |
+      {{ if not .type }}
       ((comment)* @comment .
       (function_declaration
         name: (identifier) @name
-        parameters: (parameter_list) @parameters
-        result: (_) @result
+        parameters: (parameter_list)? @parameters
+        result: (_)? @result
         body: (block)))
+        {{end}}
   - name: methodDeclarations
     query: |
       ((comment)* @comment .
       (method_declaration
-        receiver: (parameter_list) @receiver
+        receiver: (parameter_list
+        [
+          (parameter_declaration
+             name: (identifier) @receiverName
+             type: (pointer_type (type_identifier) @typeName))
+          (parameter_declaration
+             name: (identifier) @receiverName
+             type: (type_identifier) @typeName)
+        ]) @receiver
+      
         name: (field_identifier) @name
-        parameters: (parameter_list) @parameters
-        result: (_) @result
-        body: (block)))
+        parameters: (parameter_list)? @parameters
+        result: (_)? @result
+        body: (block))
+        {{ if .type }}(#eq? @typeName "{{.type}}"){{end}}
+        )
 
 template: |
   {{ range $file, $results := .ResultsByFile -}}
@@ -65,7 +88,7 @@ template: |
 
   {{ if .verbose -}}
   Results:{{ range $v := .Results }}
-    {{ $v.Name }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
+    {{ $v.QueryName }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
        {{ $captureName }}: {{ $captureValue.Text }}{{ end }}
     {{end}}{{ end }}
   {{ end -}}
