@@ -1,0 +1,31 @@
+name: comments
+short: Extract all commands in a file
+
+flags:
+  - name: verbose
+    type: bool
+    help: Output all results
+    default: false
+
+language: go
+queries:
+  - name: comments
+    query: |
+      ((comment)* @body)
+
+
+template: |
+  {{ range $file, $results := .ResultsByFile -}}
+  File: {{ $file }}
+
+  {{ with $results -}}
+  {{- range .comments.Matches -}}
+  ---
+  {{ .body.Text | indentBlock 2}}{{ end -}}{{- end -}}{{- end -}}
+
+  {{ if .verbose -}}
+  Results:{{ range $v := .Results }}
+    {{ $v.Name }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
+       {{ $captureName }}: {{ $captureValue.Text }}{{ end }}
+    {{end}}{{ end }}
+  {{ end -}}

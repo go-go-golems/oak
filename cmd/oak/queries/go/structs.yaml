@@ -1,0 +1,51 @@
+name: structs
+short: Extract all structs and interfaces in a go file
+
+flags:
+  - name: verbose
+    type: bool
+    help: Output all results
+    default: false
+
+language: go
+queries:
+  - name: structDeclarations
+    query: |
+      ((comment)* @structComment .
+       (type_declaration
+        (type_spec
+          name: (type_identifier) @structName
+          type: (struct_type) @structBody)))
+
+  - name: interfaceDeclarations
+    query: |
+      (type_declaration
+        (type_spec
+          name: (type_identifier) @interfaceName
+          type: (interface_type) @interfaceBody))
+
+template: |
+  {{ range $file, $results := .ResultsByFile -}}
+  File: {{ $file }}
+
+  {{ with $results -}}
+  Struct Declarations:
+  {{- range .structDeclarations.Matches }}
+    {{ if .structComment }}{{ .structComment.Text }} {{ end }}
+    type {{.structName.Text}} {{ .structBody.Text | indent 2 }}
+  {{ end }}
+
+  Interface Declarations:
+  {{ range .interfaceDeclarations.Matches -}}
+    {{ if .interfaceComment }}{{ .interfaceComment.Text }} {{ end }}
+    type {{ .interfaceName.Text }} {{ .interfaceBody.Text | indent 2}}
+  {{ end }}
+  {{ end -}}
+  {{ end -}}
+
+  {{ if .verbose -}}
+  Results:{{ range $v := .Results }}
+    {{ $v.Name }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
+       {{ $captureName }}: {{ $captureValue.Text }}{{ end }}
+    {{end}}{{ end }}
+  {{ end -}}
