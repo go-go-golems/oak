@@ -1,0 +1,77 @@
+name: functions
+short: Extract TypeScript functions defined using export const
+
+flags:
+  - name: verbose
+    type: bool
+    help: Output all results
+    default: false
+  - name: function
+    type: string
+    help: Only output functions matching name
+  - name: with_body
+    type: bool
+    help: When true, output the function body, else just output the function declaration and parameters
+    default: false
+  - name: list
+    type: bool
+    help: When true, output the list of function names
+    default: false
+  - name: with_comments
+    type: bool
+    help: When true, output the comments, else ignore them
+    default: false
+
+language: typescript
+queries:
+  - name: functionDeclarations
+    query: |
+      (
+       (comment)* @comment .
+       (function_declaration
+        name: (identifier) @functionName
+        parameters: (formal_parameters)? @parameters
+        body: (statement_block)? @body)
+        {{ if .function }}(#eq? @functionName "{{.function}}"){{end}}
+      )
+
+  - name: arrowFunctionDeclarations
+    query: |
+      (
+       (comment)* @comment .
+       (export_statement
+        (lexical_declaration
+          (variable_declarator
+            (identifier) @functionName
+            (arrow_function
+              parameters: (formal_parameters)? @parameters
+              body: (statement_block)? @body))))
+        {{ if .function }}(#eq? @functionName "{{.function}}"){{end}}
+      )
+
+template: |
+  {{ range $file, $results := .ResultsByFile -}}
+  File: {{ $file }}
+  {{ with $results -}}
+  {{ if $.list }}
+    {{- range .functionDeclarations.Matches }}
+    - {{ .functionName.Text }}{{ end }}
+    {{ range .arrowFunctionDeclarations.Matches }}
+    - {{ .functionName.Text }}{{ end }}
+  {{ else }}
+    {{- range .functionDeclarations.Matches }}
+      {{ if and .comment $.with_comments }}{{ .comment.Text |indentBlock 2}}{{end}}
+       function {{.functionName.Text}} {{ .parameters.Text }} {{ if $.with_body }}{{ .body.Text | indent 2 }}{{ end }}{{ end }}
+    {{ range .arrowFunctionDeclarations.Matches }}
+      {{ if and .comment $.with_comments }}{{ .comment.Text | indentBlock 2}}{{end}}
+       export const {{ .functionName.Text }} = {{ .parameters.Text }} => {{ if $.with_body }}{{ .body.Text }}{{ end }}{{ end }}
+    {{ end }}
+  {{ end -}}
+  {{ end -}}
+  {{ if .verbose -}}
+  
+  Results:{{ range $v := .Results }}
+    {{ $v.QueryName }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
+       {{ $captureName }}: {{ $captureValue.Text }}{{ end }}
+    {{end}}{{ end }}
+  {{ end -}}
