@@ -21,6 +21,10 @@ flags:
     type: bool
     help: When true, output the comments, else ignore them
     default: false
+  - name: count
+    type: int
+    help: Limit the number of functions to output
+    default: 0
 
 language: typescript
 queries:
@@ -50,24 +54,44 @@ queries:
       )
 
 template: |
-  {{ range $file, $results := .ResultsByFile -}}
+  {{ .ResultsByFile }}
+  {{ range $file, $results := .ResultsByFile }}
   File: {{ $file }}
   {{ with $results -}}
-  {{ if $.list }}
+  {{ if $.list -}}
+    {{- $count := 0 }}
     {{- range .functionDeclarations.Matches }}
-    - {{ .functionName.Text }}{{ end }}
-    {{ range .arrowFunctionDeclarations.Matches }}
-    - {{ .functionName.Text }}{{ end }}
-  {{ else }}
+    {{- if or (eq $.count 0) (lt $count $.count) }}
+  - {{ .functionName.Text }}
+    {{- $count = add $count 1 }}
+    {{- end }}
+    {{- end }}
+    {{- range .arrowFunctionDeclarations.Matches }}
+    {{- if or (eq $.count 0) (lt $count $.count) }}
+  - {{ .functionName.Text }}
+    {{- $count = add $count 1 }}
+    {{- end }}
+    {{- end }}
+  {{- else -}}
+    {{- $count := 0 }}
     {{- range .functionDeclarations.Matches }}
-      {{ if and .comment $.with_comments }}{{ .comment.Text |indentBlock 2}}{{end}}
-       function {{.functionName.Text}} {{ .parameters.Text }} {{ if $.with_body }}{{ .body.Text | indent 2 }}{{ end }}{{ end }}
-    {{ range .arrowFunctionDeclarations.Matches }}
-      {{ if and .comment $.with_comments }}{{ .comment.Text | indentBlock 2}}{{end}}
-       export const {{ .functionName.Text }} = {{ .parameters.Text }} => {{ if $.with_body }}{{ .body.Text }}{{ end }}{{ end }}
-    {{ end }}
+    {{- if or (eq $.count 0) (lt $count $.count) -}}
+    {{- if and .comment $.with_comments }}{{ .comment.Text |indentBlock 2}}{{end}}
+  function {{.functionName.Text}} {{ .parameters.Text }} {{ if $.with_body }}{{ .body.Text | indent 2 }}{{ end }}
+    {{- $count = add $count 1 }}
+    {{- end }}
+    {{- end }}
+    {{- range .arrowFunctionDeclarations.Matches }}
+    {{- if or (eq $.count 0) (lt $count $.count) }}
+    {{- if and .comment $.with_comments }}{{ .comment.Text | indentBlock 2}}{{end}}
+  export const {{ .functionName.Text }} = {{ .parameters.Text }} => {{ if $.with_body }}{{ .body.Text }}{{ end }}
+    {{- $count = add $count 1 }}
+    {{- end }}
+    {{- end }}
   {{ end -}}
-  {{ end -}}
+  {{ end }}
+  {{ end }}
+  
   {{ if .verbose -}}
   
   Results:{{ range $v := .Results }}
