@@ -464,13 +464,14 @@ func (oc *OakWriterCommand) RunIntoWriter(
 		return err
 	}
 
-	results := QueryResults{}
+	allResults := QueryResults{}
 
 	for _, fileResults := range resultsByFile {
 		for k, v := range fileResults {
-			result, ok := results[k]
+			result, ok := allResults[k]
 			if !ok {
-				results[k] = v
+				// store copy of v in allResults
+				allResults[k] = v.Clone()
 				continue
 			}
 			result.Matches = append(result.Matches, v.Matches...)
@@ -479,7 +480,7 @@ func (oc *OakWriterCommand) RunIntoWriter(
 
 	data := map[string]interface{}{
 		"ResultsByFile": resultsByFile,
-		"Results":       results,
+		"Results":       allResults,
 	}
 
 	for _, pd := range oc.description.Flags {

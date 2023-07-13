@@ -40,6 +40,15 @@ type Result struct {
 	Matches   []Match
 }
 
+func (r *Result) Clone() *Result {
+	clone := &Result{
+		QueryName: r.QueryName,
+		Matches:   make([]Match, len(r.Matches)),
+	}
+	copy(clone.Matches, r.Matches)
+	return clone
+}
+
 type QueryResults map[string]*Result
 
 // getResultsByFile is a helper function that parses the given fileNames and

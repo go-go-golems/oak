@@ -1,0 +1,137 @@
+name: create-command
+short: Generate a Sqleton query
+factories:
+  openai:
+    client:
+      timeout: 120
+    completion:
+      engine: gpt-4
+      temperature: 0.2
+      max_response_tokens: 2048
+      stop: []
+      stream: true
+flags:
+  - name: tree
+    type: stringFromFile
+    help: Example parsed tree
+    required: false
+  - name: types
+    type: stringList
+    help: List of types
+    default:
+      - int
+      - string
+      - date
+      - stringList
+      - intList
+      - float
+      - bool
+      - floatList
+  - name: instructions
+    type: string
+    help: Additional language specific instructions
+    required: false
+  - name: topic
+    type: string
+    help: Topic of the query
+    required: false
+  - name: instructions_file
+    type: stringFromFile
+    help: Additional language specific instructions
+    required: false
+  - name: topic_file
+    type: stringFromFile
+    help: Topic of the query
+    required: false
+  - name: example_name
+    type: string
+    help: Name of the example
+    default: get all items from WooCommerce orders
+  - name: example
+    type: stringFromFile
+    help: Example of the table
+    default: |
+      name: definitions
+      short: A simple example to extract go functions and structs
+
+      flags:
+        - name: verbose
+          type: bool
+          help: Output all results
+          default: false
+        - name: type
+          type: string
+          help: Only output structs types matching type
+
+      language: go
+      queries:
+        - name: structDeclarations
+          query: |
+            (
+             (comment)* @comment .
+             (type_declaration
+              (type_spec
+                name: (type_identifier) @structName
+                type: (struct_type) @structBody))
+              {{ if .type }}(#eq? @structName "{{.type}}"){{end}}
+            )
+
+        - name: functionDeclarations
+          query: |
+            {{ if not .type }}
+            ((comment)* @comment .
+            (function_declaration
+              name: (identifier) @name
+              parameters: (parameter_list)? @parameters
+              result: (_)? @result
+              body: (block)))
+              {{end}}
+
+      template: |
+        {{ range $file, $results := .ResultsByFile -}}
+        File: {{ $file }}
+        {{ with $results -}}
+        {{- range .structDeclarations.Matches }}
+        {{ if .comment }}{{ .comment.Text |indentBlock 2}}{{end -}}
+          type {{.structName.Text}} {{ .structBody.Text | indent 2 }}{{ end }}
+        {{ range .functionDeclarations.Matches }}
+        {{ if .comment }}{{ .comment.Text |indentBlock 2}}{{end -}}
+          func {{ .name.Text }}{{ .parameters.Text }} {{ .result.Text }} {{ end }}
+        {{ end -}}
+        {{ end -}}
+
+        {{ if .verbose -}}
+        Results:{{ range $v := .Results }}
+          {{ $v.QueryName }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
+             {{ $captureName }}: {{ $captureValue.Text }}{{ end }}
+          {{end}}{{ end }}
+        {{ end -}}
+
+prompt: |
+  I want to generate templates for tree-sitter queries, stored in YAML.
+  The queries array represents tree-sitter queries that are used to extract information from 
+  the parsed tree-sitter code. It is provided as go template that interpolate the flags passed to the command.
+  
+  The templates expose command line parameters that the user can use to control the query,
+  and generate useful WHERE and GROUP BY statements.
+  
+  The `flags` stored in the YAML can be of different types: {{ .types | join ", " }}. These are then passed to the go 
+  template.
+  
+  Here is an example that queries the {{ .example_name }}.
+  
+  ```yaml
+  {{ .example }}
+  ```
+  
+  {{ if .topic_file }}{{ .topic_file }} {{ end }}
+  {{ if .topic }} {{ .topic }} {{ end }}
+  {{ if .ddl }}Generate a similar template with flags to query the table described by the following DDL:
+  
+  ```sql
+  {{ .tree }}
+  ```
+  {{ end }}
+  
+  {{ if .instructions }} {{ .instructions }} {{ end }}
+  {{ if .instructions_file }} {{ .instructions_file }} {{ end }}
