@@ -28,6 +28,7 @@ import (
 	"github.com/smacker/go-tree-sitter/scala"
 	"github.com/smacker/go-tree-sitter/svelte"
 	"github.com/smacker/go-tree-sitter/toml"
+	"github.com/smacker/go-tree-sitter/typescript/tsx"
 	"github.com/smacker/go-tree-sitter/typescript/typescript"
 	"github.com/smacker/go-tree-sitter/yaml"
 	"path"
@@ -89,6 +90,8 @@ func LanguageNameToSitterLanguage(name string) (*sitter.Language, error) {
 		return toml.GetLanguage(), nil
 	case "typescript":
 		return typescript.GetLanguage(), nil
+	case "tsx":
+		return tsx.GetLanguage(), nil
 	case "yaml":
 		return yaml.GetLanguage(), nil
 	default:
@@ -129,7 +132,7 @@ var (
 		"*.svelte": "svelte",
 		"*.toml":   "toml",
 		"*.ts":     "typescript",
-		"*.tsx":    "typescript",
+		"*.tsx":    "tsx",
 		"*.yml":    "yaml",
 		"*.yaml":   "yaml",
 	}

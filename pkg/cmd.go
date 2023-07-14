@@ -497,7 +497,11 @@ func (oc *OakWriterCommand) RunIntoWriter(
 		return err
 	}
 
-	_, err = w.Write(buf.Bytes())
+	s := buf.String()
+	// trim left and right
+	s = strings.TrimSpace(s) + "\n"
+
+	_, err = w.Write(([]byte)(s))
 	if err != nil {
 		return err
 	}
