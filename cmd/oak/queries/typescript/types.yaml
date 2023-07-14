@@ -1,0 +1,148 @@
+name: types
+short: Extract TypeScript type declarations
+
+flags:
+  - name: verbose
+    type: bool
+    help: Output all results
+    default: false
+  - name: type
+    type: string
+    help: Only output types matching name
+  - name: list
+    type: bool
+    help: When true, output the list of type names
+    default: false
+  - name: with_comments
+    type: bool
+    help: When true, output the comments, else ignore them
+    default: false
+  - name: count
+    type: int
+    help: Limit the number of types to output
+    default: 0
+  - name: offset
+    type: int
+    help: Offset the number of tests to output
+    default: 0
+
+language: tsx
+queries:
+  - name: typeDeclarations
+    query: |
+      (
+       (comment)* @comment .
+       (
+         type_alias_declaration
+         name: (type_identifier) @typeName
+         value: (_) @body
+      )
+        {{ if .type }}(#eq? @typeName "{{ .type }}"){{end}}
+      
+      )
+  - name: interfaceDeclarations
+    query: |
+      (
+       (comment)* @comment .
+       (
+        interface_declaration
+        name: (type_identifier) @interfaceName
+        body: (_) @body
+       )
+        {{ if .type }}(#eq? @interfaceName "{{ .type }}"){{end}}      
+      )  
+  - name: enumDeclarations
+    query: |
+      (
+        (comment)* @comment .
+        (
+         enum_declaration
+         name: (identifier) @enumName
+         body: (_) @body
+        )
+        {{ if .type }}(#eq? @enumName "{{ .type }}"){{end}}      
+      ) 
+
+template: |
+  {{ $skipLimit := (and (eq $.count 0) (eq $.offset 0)) }}
+  {{ range $file, $results := .ResultsByFile }}
+  {{ if  (gt (len $.ResultsByFile) 1) -}}File: {{ $file }}{{ end }}
+  {{- with $results -}}
+  {{ if $.list -}}
+    {{- $count := 0 }}
+    {{- range .typeDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
+  - {{ .typeName.Text }}
+    {{- end }}
+    {{- $count = add $count 1 }}
+    {{- end }}
+    {{- range .interfaceDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
+  - {{ .interfaceName.Text }}
+    {{- end }}
+    {{- $count = add $count 1 }}
+    {{- end }}
+    {{- range .enumDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
+  - {{ .enumName.Text }}
+    {{- end }}
+    {{- $count = add $count 1 }}
+    {{- end }}
+  {{- else -}}
+    {{- $count := 0 }}
+    {{- range .typeDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
+    {{- if and .comment $.with_comments }}{{ .comment.Text | indentBlock 2}}{{end}}
+  type {{.typeName.Text}} = {
+  {{ .body.Text | indentBlock 2 -}}
+  }
+    {{ end }}
+    {{ $count = add $count 1 }}
+    {{- end }}
+    {{- range .interfaceDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
+    {{- if and .comment $.with_comments }}{{ .comment.Text | indentBlock 2}}{{end}}
+  interface {{.interfaceName.Text}} = {
+  {{ .body.Text | indentBlock 2 -}}
+  }
+    {{ end }}
+    {{ $count = add $count 1 }}
+    {{- end }}
+    {{- range .enumDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
+    {{- if and .comment $.with_comments }}{{ .comment.Text | indentBlock 2}}{{end}}
+  enum {{.enumName.Text}} = {
+  {{ .body.Text | indentBlock 2 -}}
+  }
+    {{ end }}
+    {{ $count = add $count 1 }}
+    {{- end }}
+  {{ end -}}
+  {{ end }}
+  {{ end }}
+  
+  {{ if .verbose -}}
+  
+  Results:{{ range $v := .Results }}
+    {{ $v.QueryName }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
+      {{ $captureName }}: {{ $captureValue.Text }}{{ end }}
+    {{end}}{{ end }}
+  {{ end -}}

@@ -25,8 +25,16 @@ flags:
     type: int
     help: Limit the number of functions to output
     default: 0
+  - name: offset
+    type: int
+    help: Offset the number of tests to output
+    default: 0
+  - name: with_private
+    type: bool
+    help: When true, output private functions
+    default: false
 
-language: typescript
+language: tsx
 queries:
   - name: functionDeclarations
     query: |
@@ -43,50 +51,67 @@ queries:
     query: |
       (
        (comment)* @comment .
+       {{ if not $.with_private -}}
        (export_statement
+       {{ end -}}
         (lexical_declaration
           (variable_declarator
-            (identifier) @functionName
-            (arrow_function
+            name: (identifier) @functionName
+            value: (arrow_function
               parameters: (formal_parameters)? @parameters
-              body: (statement_block)? @body))))
+              body: (statement_block)? @body)))
+      {{- if not $.with_private -}}
+      )
+      {{ end -}}
         {{ if .function }}(#eq? @functionName "{{.function}}"){{end}}
       )
 
 template: |
-  {{ .ResultsByFile }}
+  {{ $skipLimit := (and (eq $.count 0) (eq $.offset 0)) }}
   {{ range $file, $results := .ResultsByFile }}
-  File: {{ $file }}
+  {{ if  (gt (len $.ResultsByFile) 1) -}}File: {{ $file }}{{ end }}
   {{ with $results -}}
   {{ if $.list -}}
     {{- $count := 0 }}
-    {{- range .functionDeclarations.Matches }}
-    {{- if or (eq $.count 0) (lt $count $.count) }}
+    {{- range .functionDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
   - {{ .functionName.Text }}
+    {{- end }}
     {{- $count = add $count 1 }}
     {{- end }}
-    {{- end }}
-    {{- range .arrowFunctionDeclarations.Matches }}
-    {{- if or (eq $.count 0) (lt $count $.count) }}
+    {{- range .arrowFunctionDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
   - {{ .functionName.Text }}
-    {{- $count = add $count 1 }}
     {{- end }}
+    {{- $count = add $count 1 }}
     {{- end }}
   {{- else -}}
     {{- $count := 0 }}
-    {{- range .functionDeclarations.Matches }}
-    {{- if or (eq $.count 0) (lt $count $.count) -}}
+    {{- range .functionDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
     {{- if and .comment $.with_comments }}{{ .comment.Text |indentBlock 2}}{{end}}
   function {{.functionName.Text}} {{ .parameters.Text }} {{ if $.with_body }}{{ .body.Text | indent 2 }}{{ end }}
+    {{- end }}
     {{- $count = add $count 1 }}
     {{- end }}
-    {{- end }}
-    {{- range .arrowFunctionDeclarations.Matches }}
-    {{- if or (eq $.count 0) (lt $count $.count) }}
+    {{- range .arrowFunctionDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
     {{- if and .comment $.with_comments }}{{ .comment.Text | indentBlock 2}}{{end}}
   export const {{ .functionName.Text }} = {{ .parameters.Text }} => {{ if $.with_body }}{{ .body.Text }}{{ end }}
-    {{- $count = add $count 1 }}
     {{- end }}
+    {{- $count = add $count 1 }}
     {{- end }}
   {{ end -}}
   {{ end }}

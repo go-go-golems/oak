@@ -1,0 +1,82 @@
+name: tests
+short: Extract unit tests from a file
+
+flags:
+  - name: verbose
+    type: bool
+    help: Output all results
+    default: false
+  - name: with_body
+    type: bool
+    help: When true, output the test body, else just output the test declaration
+    default: false
+  - name: list
+    type: bool
+    help: When true, output the list of test names
+    default: false
+  - name: with_comments
+    type: bool
+    help: When true, output the comments, else ignore them
+    default: false
+  - name: count
+    type: int
+    help: Limit the number of tests to output
+    default: 0
+  - name: offset
+    type: int
+    help: Offset the number of tests to output
+    default: 0
+
+language: typescript
+queries:
+  - name: testDeclarations
+    query: |
+      (call_expression
+        function: (identifier) @functionName
+        arguments: (arguments
+          (string) @testName
+          (arrow_function
+            body: (statement_block)? @body))
+        (#eq? @functionName "test")
+      )
+
+template: |
+  {{ $skipLimit := (and (eq $.count 0) (eq $.offset 0)) }}
+  {{ range $file, $results := .ResultsByFile }}
+  File: {{ $file }}
+  {{ with $results -}}
+  {{ if $.list -}}
+    {{- $count := 0 }}
+    {{- range .testDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
+  - {{ .testName.Text }}
+    {{- end }}
+    {{- $count = add $count 1 }}
+    {{- end }}
+  {{- else -}}
+    {{- $count := 0 }}
+    {{- range .testDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
+    {{- if and .comment $.with_comments }}{{ .comment.Text |indentBlock 2}}{{end}}
+  {{ .functionName.Text }}({{ .testName.Text }}{{ if $.with_body }}, () => {{ .body.Text | indent 2 }}
+  {{ end }})
+    {{- end }}
+    {{- $count = add $count 1 }}
+    {{- end }}
+  {{ end -}}
+  {{ end }}
+  {{ end }}
+  
+  {{ if .verbose -}}
+  
+  Results:{{ range $v := .Results }}
+    {{ $v.QueryName }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
+       {{ $captureName }}: {{ $captureValue.Text }}{{ end }}
+    {{end}}{{ end }}
+  {{ end -}}
