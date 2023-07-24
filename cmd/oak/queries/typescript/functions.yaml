@@ -69,7 +69,16 @@ queries:
 template: |
   {{ $skipLimit := (and (eq $.count 0) (eq $.offset 0)) }}
   {{ range $file, $results := .ResultsByFile }}
-  {{ if  (gt (len $.ResultsByFile) 1) -}}File: {{ $file }}{{ end }}
+  {{ $hasResults := 
+     (and 
+       (gt (len $.ResultsByFile) 1)
+       (or 
+         (gt (len $results.functionDeclarations.Matches) 0) 
+         (gt (len $results.arrowFunctionDeclarations.Matches) 0)
+       )
+      )
+  }}
+  {{ if  $hasResults -}}File: {{ $file }}{{ end }}
   {{ with $results -}}
   {{ if $.list -}}
     {{- $count := 0 }}
