@@ -100,41 +100,41 @@ func LanguageNameToSitterLanguage(name string) (*sitter.Language, error) {
 }
 
 var (
-	fileEndingToLanguageName = map[string]string{
-		"*.sh":       "bash",
-		"*.c":        "c",
-		"*.cpp":      "cpp",
-		"*.h":        "cpp",
-		"*.hpp":      "cpp",
-		"*.cs":       "csharp",
-		"*.css":      "css",
-		"*.cue":      "cue",
-		"Dockerfile": "dockerfile",
-		"*.ex":       "elixir",
-		"*.elm":      "elm",
-		"*.go":       "go",
-		"*.hcl":      "hcl",
-		"*.tf":       "hcl",
-		"*.html":     "html",
-		"*.java":     "java",
-		"*.js":       "javascript",
-		"*.jsx":      "javascript",
-		"*.kt":       "kotlin",
-		//"*.lua":      "lua",
-		"*.ml":     "ocaml",
-		"*.mli":    "ocaml",
-		"*.php":    "php",
-		"*.proto":  "protobuf",
-		"*.py":     "python",
-		"*.rb":     "ruby",
-		"*.rs":     "rust",
-		"*.scala":  "scala",
-		"*.svelte": "svelte",
-		"*.toml":   "toml",
-		"*.ts":     "typescript",
-		"*.tsx":    "tsx",
-		"*.yml":    "yaml",
-		"*.yaml":   "yaml",
+	fileEndingToLanguageName = map[string][]string{
+		"*.sh":       {"bash"},
+		"*.c":        {"c"},
+		"*.cpp":      {"cpp"},
+		"*.h":        {"cpp"},
+		"*.hpp":      {"cpp"},
+		"*.cs":       {"csharp"},
+		"*.css":      {"css"},
+		"*.cue":      {"cue"},
+		"Dockerfile": {"dockerfile"},
+		"*.ex":       {"elixir"},
+		"*.elm":      {"elm"},
+		"*.go":       {"go"},
+		"*.hcl":      {"hcl"},
+		"*.tf":       {"hcl"},
+		"*.html":     {"html"},
+		"*.java":     {"java"},
+		"*.js":       {"javascript"},
+		"*.jsx":      {"javascript"},
+		"*.kt":       {"kotlin"},
+		//"*.lua":      []string{"lua"},
+		"*.ml":     {"ocaml"},
+		"*.mli":    {"ocaml"},
+		"*.php":    {"php"},
+		"*.proto":  {"protobuf"},
+		"*.py":     {"python"},
+		"*.rb":     {"ruby"},
+		"*.rs":     {"rust"},
+		"*.scala":  {"scala"},
+		"*.svelte": {"svelte"},
+		"*.toml":   {"toml"},
+		"*.ts":     {"typescript", "tsx"},
+		"*.tsx":    {"tsx"},
+		"*.yml":    {"yaml"},
+		"*.yaml":   {"yaml"},
 	}
 )
 
@@ -142,8 +142,10 @@ func GetLanguageGlobs(lang string) ([]string, error) {
 	ret := []string{}
 
 	for filename, lang_ := range fileEndingToLanguageName {
-		if lang_ == lang {
-			ret = append(ret, fmt.Sprintf("**/%s", filename))
+		for _, lang__ := range lang_ {
+			if lang__ == lang {
+				ret = append(ret, fmt.Sprintf("**/%s", filename))
+			}
 		}
 	}
 
@@ -163,7 +165,7 @@ func FileNameToSitterLanguage(filename string) (*sitter.Language, error) {
 			return nil, err
 		}
 		if matched {
-			return LanguageNameToSitterLanguage(name)
+			return LanguageNameToSitterLanguage(name[0])
 		}
 	}
 	return nil, fmt.Errorf("unsupported file name: %s", filename)

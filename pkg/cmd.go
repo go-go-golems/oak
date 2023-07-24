@@ -14,6 +14,7 @@ import (
 	"github.com/go-go-golems/glazed/pkg/cmds/loaders"
 	"github.com/go-go-golems/glazed/pkg/cmds/parameters"
 	"github.com/go-go-golems/glazed/pkg/helpers/cast"
+	"github.com/go-go-golems/glazed/pkg/helpers/compare"
 	"github.com/go-go-golems/glazed/pkg/helpers/templating"
 	"github.com/go-go-golems/glazed/pkg/middlewares"
 	"github.com/go-go-golems/glazed/pkg/settings"
@@ -338,22 +339,19 @@ func (oc *OakCommand) RenderQueries(ps map[string]interface{}) error {
 }
 
 func collectSources(sources []string, globs []string) ([]string, error) {
-	if len(globs) == 0 {
-		return sources, nil
-	}
-
 	ret := []string{}
 	// globs not empty implies recursion, if the glob patterns are recursive
-	if len(globs) > 0 {
-		for _, source := range sources {
-			// check if source is a directory
-			fi, err := os.Stat(source)
-			if err != nil {
-				return nil, err
-			}
-			if !fi.IsDir() {
-				ret = append(ret, source)
-			} else {
+	for _, source := range sources {
+		source = strings.TrimSuffix(source, "/")
+		// check if source is a directory
+		fi, err := os.Stat(source)
+		if err != nil {
+			return nil, err
+		}
+		if !fi.IsDir() {
+			ret = append(ret, source)
+		} else {
+			if len(globs) > 0 {
 				for _, glob := range globs {
 					files, err := doublestar.Glob(os.DirFS(source), glob, doublestar.WithFilesOnly())
 					if err != nil {
@@ -364,11 +362,12 @@ func collectSources(sources []string, globs []string) ([]string, error) {
 					}
 				}
 			}
-
 		}
 
-		return ret, nil
 	}
+
+	// remove duplicates
+	ret = compare.RemoveDuplicates(ret)
 
 	return ret, nil
 }
