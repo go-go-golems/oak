@@ -1,0 +1,127 @@
+name: functions
+short: Extract PHP functions defined using export const
+
+flags:
+  - name: verbose
+    type: bool
+    help: Output all results
+    default: false
+  - name: function
+    type: string
+    help: Only output functions matching name
+  - name: with_body
+    type: bool
+    help: When true, output the function body, else just output the function declaration and parameters
+    default: false
+  - name: list
+    type: bool
+    help: When true, output the list of function names
+    default: false
+  - name: with_comments
+    type: bool
+    help: When true, output the comments, else ignore them
+    default: false
+  - name: count
+    type: int
+    help: Limit the number of functions to output
+    default: 0
+  - name: offset
+    type: int
+    help: Offset the number of tests to output
+    default: 0
+  - name: with_private
+    type: bool
+    help: When true, output private functions
+    default: false
+
+language: php
+queries:
+  - name: functionDeclarations
+    query: |
+      (
+        (comment)* @comment .
+        (function_definition
+           name: (name) @functionName
+           parameters: (formal_parameters)? @parameters
+           body: (compound_statement)? @body)
+        {{ if .function }}(#eq? @functionName "{{.function}}"){{end}}
+      )
+
+  - name: methodDeclarations
+    query: |
+      (
+        (comment)* @comment .
+        (method_declaration
+          name: (name) @functionName
+          parameters: (formal_parameters)? @parameters
+          body: (compound_statement)? @body)
+        {{ if .function }}(#eq? @functionName "{{.function}}"){{end}}
+      )
+
+template: |
+  {{ $skipLimit := (and (eq $.count 0) (eq $.offset 0)) }}
+  {{ range $file, $results := .ResultsByFile }}
+  {{ $hasResults := 
+     (and 
+       (gt (len $.ResultsByFile) 1)
+       (or 
+         (gt (len $results.functionDeclarations.Matches) 0) 
+         (gt (len $results.methodDeclarations.Matches) 0)
+       )
+      )
+  }}
+  {{ if  $hasResults -}}File: {{ $file }}{{ end }}
+  {{ with $results -}}
+  {{ if $.list -}}
+    {{- $count := 0 }}
+    {{- range .functionDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
+  - {{ .functionName.Text }}
+    {{- end }}
+    {{- $count = add $count 1 }}
+    {{- end }}
+    {{- range .methodDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
+  - {{ .functionName.Text }}
+    {{- end }}
+    {{- $count = add $count 1 }}
+    {{- end }}
+  {{- else -}}
+    {{- $count := 0 }}
+    {{- range .functionDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
+    {{- if and .comment $.with_comments }}{{ .comment.Text |indentBlock 2}}{{end}}
+  function {{.functionName.Text}} {{ .parameters.Text }} {{ if $.with_body }}{{ .body.Text | indent 2 }}{{ end }}
+    {{- end }}
+    {{- $count = add $count 1 }}
+    {{- end }}
+    {{- range .methodDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
+    {{- if and .comment $.with_comments }}{{ .comment.Text | indentBlock 2}}{{end}}
+  export const {{ .functionName.Text }} = {{ .parameters.Text }} => {{ if $.with_body }}{{ .body.Text }}{{ end }}
+    {{- end }}
+    {{- $count = add $count 1 }}
+    {{- end }}
+  {{ end -}}
+  {{ end }}
+  {{ end }}
+  
+  {{ if .verbose -}}
+  
+  Results:{{ range $v := .Results }}
+    {{ $v.QueryName }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
+       {{ $captureName }}: {{ $captureValue.Text }}{{ end }}
+    {{end}}{{ end }}
+  {{ end -}}
