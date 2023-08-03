@@ -110,7 +110,7 @@ template: |
     {{ $and := (and $gt $lt) -}}
     {{- if or $skipLimit $and }}
     {{- if and .comment $.with_comments }}{{ .comment.Text | indentBlock 2}}{{end}}
-  export const {{ .functionName.Text }} = {{ .parameters.Text }} => {{ if $.with_body }}{{ .body.Text }}{{ end }}
+  function {{ .functionName.Text }} {{ .parameters.Text }} {{ if $.with_body }}{{ .body.Text | indent 2 }}{{ end }}
     {{- end }}
     {{- $count = add $count 1 }}
     {{- end }}

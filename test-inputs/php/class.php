@@ -9,7 +9,7 @@ use MyApp\Util\ExampleUtil;
 /**
  * An example class to demonstrate syntax.
  */
-final class ExampleClass
+class ExampleClass
 {
     private readonly int $var1;
 

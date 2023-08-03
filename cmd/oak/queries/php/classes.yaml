@@ -1,0 +1,87 @@
+name: classes
+short: Extract PHP classes
+
+flags:
+  - name: verbose
+    type: bool
+    help: Output all results
+    default: false
+  - name: class
+    type: string
+    help: Only output classes matching name
+  - name: list
+    type: bool
+    help: When true, output the list of type names
+    default: false
+  - name: with_comments
+    type: bool
+    help: When true, output the comments, else ignore them
+    default: false
+  - name: with_body
+    type: bool
+    help: When true, output the class body, else just output the class declaration
+    default: false
+  - name: count
+    type: int
+    help: Limit the number of types to output
+    default: 0
+  - name: offset
+    type: int
+    help: Offset the number of tests to output
+    default: 0
+
+language: php
+queries:
+  - name: classDeclarations
+    query: |
+      (
+       (comment)* @comment .
+       (class_declaration
+          (class_modifier)?  @modifier
+          name: (name) @className
+          body: (declaration_list) @body
+       )
+        {{ if .class }}(#eq? @className "{{ .class }}"){{end}}
+      )
+
+template: |
+  {{ $skipLimit := (and (eq $.count 0) (eq $.offset 0)) }}
+  {{ range $file, $results := .ResultsByFile }}
+  {{ if  (gt (len $.ResultsByFile) 1) -}}File: {{ $file }}{{ end }}
+  {{- with $results -}}
+  {{ if $.list -}}
+    {{- $count := 0 }}
+    {{- range .classDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
+  - {{ .className.Text }}
+    {{- end }}
+    {{- $count = add $count 1 }}
+    {{- end }}
+  {{- else -}}
+    {{- $count := 0 }}
+    {{- range .classDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
+    {{- if and .comment $.with_comments }}{{ .comment.Text | indentBlock 2}}{{end}}
+  {{ if .modifier }}{{ .modifier.Text }} {{ end }}class {{.className.Text}} {{ if $.with_body }}= {
+  {{ .body.Text | indentBlock 2 -}}
+  }{{ end }}
+    {{ end }}
+    {{ $count = add $count 1 }}
+    {{- end }}
+  {{ end -}}
+  {{ end }}
+  {{ end }}
+  
+  {{ if .verbose -}}
+  
+  Results:{{ range $k, $v := .Results }}
+    {{ $k }}: {{ $v.QueryName }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
+      {{ $captureName }}: {{ $captureValue.Text }}{{ end }}
+    {{end}}{{ end }}
+  {{ end -}}
