@@ -14,7 +14,7 @@ type OakCommand struct {
 	Template string        `yaml:"template"`
 
 	SitterLanguage *sitter.Language
-	description    *cmds.CommandDescription
+	*cmds.CommandDescription
 }
 
 type Capture struct {
