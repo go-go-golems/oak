@@ -34,7 +34,7 @@ import (
 var oakLayerYaml string
 
 type OakParameterLayer struct {
-	layers.ParameterLayerImpl
+	layers.ParameterLayerImpl `yaml:",inline"`
 }
 
 func NewOakParameterLayer(
@@ -132,10 +132,6 @@ func (o *OakCommandLoader) LoadCommandAliasFromYAML(
 	options ...alias.Option,
 ) ([]*alias.CommandAlias, error) {
 	return loaders.LoadCommandAliasFromYAML(s, options...)
-}
-
-func (oc *OakCommand) Description() *cmds.CommandDescription {
-	return oc.description
 }
 
 type OakCommandOption func(*OakCommand)
@@ -399,7 +395,7 @@ type OakWriterCommand struct {
 func NewOakWriterCommand(d *cmds.CommandDescription, options ...OakCommandOption) *OakWriterCommand {
 	cmd := OakWriterCommand{
 		OakCommand: &OakCommand{
-			description: d,
+			CommandDescription: d,
 		},
 	}
 	for _, option := range options {
@@ -482,7 +478,7 @@ func (oc *OakWriterCommand) RunIntoWriter(
 		"Results":       allResults,
 	}
 
-	for _, pd := range oc.description.Flags {
+	for _, pd := range oc.Flags {
 		v, ok := ps[pd.Name]
 		if !ok {
 			continue
@@ -604,7 +600,7 @@ func (oc *OakGlazedCommand) Run(
 func NewOakGlazedCommand(d *cmds.CommandDescription, options ...OakCommandOption) *OakGlazedCommand {
 	cmd := OakGlazedCommand{
 		OakCommand: &OakCommand{
-			description: d,
+			CommandDescription: d,
 		},
 	}
 	for _, option := range options {
