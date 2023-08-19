@@ -15,6 +15,10 @@ flags:
     type: stringFromFile
     help: Example parsed tree
     required: false
+  - name: query
+    type: stringFromFile
+    help: Example tree sitter queries
+    required: false
   - name: types
     type: stringList
     help: List of types
@@ -46,10 +50,10 @@ flags:
   - name: example_name
     type: string
     help: Name of the example
-    default: get all items from WooCommerce orders
+    default: Get all struct and function declaration in a golang file.
   - name: example
     type: stringFromFile
-    help: Example of the table
+    help: Example of a resulting command
     default: |
       name: definitions
       short: A simple example to extract go functions and structs
@@ -109,6 +113,7 @@ flags:
 
 prompt: |
   I want to generate templates for tree-sitter queries, stored in YAML.
+  
   The queries array represents tree-sitter queries that are used to extract information from 
   the parsed tree-sitter code. It is provided as go template that interpolate the flags passed to the command.
   
@@ -118,7 +123,9 @@ prompt: |
   The `flags` stored in the YAML can be of different types: {{ .types | join ", " }}. These are then passed to the go 
   template.
   
-  Here is an example that queries the {{ .example_name }}.
+  Here is an example:
+  
+  NAME: {{ .example_name }}
   
   ```yaml
   {{ .example }}
@@ -126,10 +133,17 @@ prompt: |
   
   {{ if .topic_file }}{{ .topic_file }} {{ end }}
   {{ if .topic }} {{ .topic }} {{ end }}
-  {{ if .ddl }}Generate a similar template with flags to query the table described by the following DDL:
+  {{ if .tree }}Generate a similar template with flags to query the abstract syntax tree described by:
   
-  ```sql
+  ```parse-tree
   {{ .tree }}
+  ```
+  {{ end }}
+  
+  {{ if .query }}Generate a similar template with flags to run the following queries and interpolate their results:
+  
+  ```tree-sitter-query
+  {{ .query }}
   ```
   {{ end }}
   

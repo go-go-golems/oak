@@ -1,0 +1,105 @@
+name: filters
+short: A command to list the filter calls to WordPress filters
+
+flags:
+  - name: verbose
+    type: bool
+    help: Output all results
+    default: false
+  - name: match_action
+    type: string
+    help: only output action calls matching action
+  - name: match_filter
+    type: string
+    help: only output filter calls matching filters
+  - name: concise
+    type: bool
+    help: When true, output the concise version of the results
+    default: false
+  - name: only_filters
+    type: bool
+    help: When true, only output filter calls
+    default: false
+  - name: only_actions
+    type: bool
+    help: When true, only output action calls
+    default: false
+
+
+language: php
+queries:
+  - name: filterCalls
+    query: |
+      (
+      (
+       (function_call_expression
+        function: (_) @function
+        arguments: (arguments . (string) @filter ) @arguments  
+       )
+       (#eq? @function "apply_filters")
+       {{ if .match_filter }}(#eq? @filter "{{.match_filter}}"){{end}}
+      ) @fullexpression
+      )
+  - name: actionCalls
+    query: |
+      (
+       (function_call_expression
+        function: (_) @function
+        arguments: (arguments . (string) @action) @arguments 
+       )
+       (#eq? @function "do_action")
+       {{ if .match_action }}(#eq? @action "{{.match_action}}"){{end}}
+      )
+  - name: filterRegistrations
+    query: |
+      (
+      (
+       (function_call_expression
+        function: (_) @function
+        arguments: (arguments . (string) @filter ) @arguments  
+       )
+       (#eq? @function "add_filter")
+       {{ if .match_filter }}(#eq? @filter "{{.match_filter}}"){{end}}
+      ) @fullexpression
+      )
+  - name: actionRegistrations
+    query: |
+      (
+       (function_call_expression
+        function: (_) @function
+        arguments: (arguments . (string) @action) @arguments 
+       )
+       (#eq? @function "add_action")
+       {{ if .match_action }}(#eq? @action "{{.match_action}}"){{end}}
+      )
+
+template: |
+  {{ range $file, $results := .ResultsByFile -}}
+  File: {{ $file }}
+  {{ with $results -}}
+  {{- if not $.only_actions }}# Filters 
+  {{ range .filterCalls.Matches }}
+    Filter: {{.filter.Text}}
+      {{ if not $.concise }}{{ if .arguments.Text }}Full expression: {{ .arguments.Text | indent 2 }}{{- end }}{{- end }} {{ end }}
+  {{- range .filterRegistrations.Matches }}
+    RegisterFilter: {{.filter.Text}}
+      {{ if not $.concise }}{{ if .arguments.Text }}Full expression: {{ .arguments.Text | indent 2 }}{{- end }}{{- end }} {{ end }}
+  {{- end }}
+  {{- if not $.only_filters }}
+  # Actions
+  {{ range .actionCalls.Matches }}
+    Action: {{.action.Text}}
+      {{ if not $.concise }}{{ if .arguments.Text }}Full expression: {{ .arguments.Text | indent 2 }}{{- end }}{{- end }} {{ end -}}
+  {{- range .actionRegistrations.Matches }}
+    RegisterAction: {{.action.Text}}
+      {{ if not $.concise }}{{ if .arguments.Text }}Full expression: {{ .arguments.Text | indent 2 }}{{- end }}{{- end }}{{ end -}}
+  {{- end }}
+  {{ end -}}
+  {{ end -}}
+
+  {{ if .verbose -}}
+  Results:{{ range $v := .Results }}
+    {{ $v.QueryName }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
+       {{ $captureName }}: {{ $captureValue.Text }}{{ end }}
+    {{end}}{{ end }}
+  {{ end -}}
