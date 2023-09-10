@@ -6,47 +6,59 @@ flags:
     type: bool
     help: Output all results
     default: false
-  - name: type
+  - name: name
     type: string
-    help: Only output methods and types matching type
+    help: Only output methods and types matching name
+  - name: definition_type
+    type: stringList
+    help: Only output definitions matching types (struct, interface, function, method)
+  - name: with_body
+    type: bool
+    help: When true, output the function body, else just output the function declaration and parameters
+    default: false
 
 language: go
 queries:
   - name: structDeclarations
     query: |
+      {{ if (or (not .definition_type) (has "struct" .definition_type)) }}
       (
        (comment)* @comment .
        (type_declaration
         (type_spec
           name: (type_identifier) @structName
           type: (struct_type) @structBody))
-        {{ if .type }}(#eq? @structName "{{.type}}"){{end}}
+        {{ if .name }}(#eq? @structName "{{.name}}"){{end}}
       )
+      {{ end }}
 
   - name: interfaceDeclarations
     query: |
-      {{ if not .type }}
+      {{ if (or (not .definition_type) (has "interface" .definition_type)) }}
       ((comment)* @comment .
        (type_declaration
         (type_spec
           name: (type_identifier) @interfaceName
           type: (interface_type) @interfaceBody))
-        {{ if .type }}(#eq? @interfaceName "{{.type}}"){{end}}
+        {{ if .name }}(#eq? @interfaceName "{{.name}}"){{end}}
       )
-      {{ end}}
+      {{ end }}
 
   - name: functionDeclarations
     query: |
-      {{ if not .type }}
+      {{ if (or (not .definition_type) (has "function" .definition_type)) }}
       ((comment)* @comment .
       (function_declaration
         name: (identifier) @name
         parameters: (parameter_list)? @parameters
         result: (_)? @result
-        body: (block)))
-        {{end}}
+        body: (block) @body)
+        {{ if .name }}(#eq? @name "{{.name}}"){{end}}
+      )
+      {{end}}
   - name: methodDeclarations
     query: |
+      {{ if (or (not .definition_type) (has "method" .definition_type)) }}
       ((comment)* @comment .
       (method_declaration
         receiver: (parameter_list
@@ -62,14 +74,26 @@ queries:
         name: (field_identifier) @name
         parameters: (parameter_list)? @parameters
         result: (_)? @result
-        body: (block))
-        {{ if .type }}(#eq? @typeName "{{.type}}"){{end}}
+        body: (block) @body)
+        {{ if .name }}(#eq? @typeName "{{.name}}"){{end}}
         )
+      {{end}}
 
 template: |
   {{ range $file, $results := .ResultsByFile -}}
-  File: {{ $file }}
+  {{ $hasResults := 
+     (and 
+       (gt (len $.ResultsByFile) 1)
+       (or 
+         (and $results.functionDeclarations (gt (len $results.functionDeclarations.Matches) 0))
+         (and $results.interfaceDeclarations (gt (len $results.interfaceDeclarations.Matches) 0))
+         (and $results.structDeclarations (gt (len $results.structDeclarations.Matches) 0))
+         (and $results.methodDeclarations (gt (len $results.methodDeclarations.Matches) 0))
+       )
+      )
+  }}
   {{ with $results -}}
+  {{ if  $hasResults -}}File: {{ $file }}{{ end }}
   {{- range .structDeclarations.Matches }}
   {{ if .comment }}{{ .comment.Text |indentBlock 2}}{{end -}}
     type {{.structName.Text}} {{ .structBody.Text | indent 2 }}{{ end }}
@@ -79,10 +103,12 @@ template: |
     type {{ .interfaceName.Text }} {{ .interfaceBody.Text | indent 2}} {{ end }}
   {{ range .functionDeclarations.Matches }}
   {{ if .comment }}{{ .comment.Text |indentBlock 2}}{{end -}}
-    func {{ .name.Text }}{{ .parameters.Text }} {{ .result.Text }} {{ end }}
+    func {{ .name.Text }}{{ .parameters.Text }} {{ .result.Text }} 
+        {{- if $.with_body }} {{ .body.Text}}{{ end }} {{ end }}
   {{ range .methodDeclarations.Matches }}
   {{ if .comment }}{{ .comment.Text |indentBlock 2}}{{end -}}
-    func {{.receiver.Text}} {{ .name.Text }}{{ .parameters.Text }} {{ .result.Text }}{{ end -}}
+    func {{.receiver.Text}} {{ .name.Text }}{{ .parameters.Text }} {{ .result.Text }}
+        {{- if $.with_body }} {{ .body.Text}}{{end}}{{ end -}}
   {{ end -}}
   {{ end -}}
 
