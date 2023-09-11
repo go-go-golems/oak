@@ -56,6 +56,7 @@ queries:
         {{ if .name }}(#eq? @name "{{.name}}"){{end}}
       )
       {{end}}
+
   - name: methodDeclarations
     query: |
       {{ if (or (not .definition_type) (has "method" .definition_type)) }}
@@ -69,6 +70,12 @@ queries:
           (parameter_declaration
              name: (identifier) @receiverName
              type: (type_identifier) @typeName)
+          (parameter_declaration
+             name: (identifier) @receiverName
+             type: (pointer_type (generic_type type: (type_identifier) @typeName)))
+          (parameter_declaration
+             name: (identifier) @receiverName
+             type: (generic_type type: (type_identifier) @typeName))
         ]) @receiver
       
         name: (field_identifier) @name
@@ -96,16 +103,16 @@ template: |
   {{ if  $hasResults -}}File: {{ $file }}{{ end }}
   {{- range .structDeclarations.Matches }}
   {{ if .comment }}{{ .comment.Text |indentBlock 2}}{{end -}}
-    type {{.structName.Text}} {{ .structBody.Text | indent 2 }}{{ end }}
+    type {{.structName.Text}} {{ .structBody.Text  }}{{ end }}
   {{ range .interfaceDeclarations.Matches -}}
   {{ if .comment }}{{ .comment.Text |indentBlock 2}}
-  {{end }}
-    type {{ .interfaceName.Text }} {{ .interfaceBody.Text | indent 2}} {{ end }}
-  {{ range .functionDeclarations.Matches }}
+  {{ end }}
+    type {{ .interfaceName.Text }} {{ .interfaceBody.Text }} {{ end }}
+  {{- range .functionDeclarations.Matches }}
   {{ if .comment }}{{ .comment.Text |indentBlock 2}}{{end -}}
     func {{ .name.Text }}{{ .parameters.Text }} {{ .result.Text }} 
         {{- if $.with_body }} {{ .body.Text}}{{ end }} {{ end }}
-  {{ range .methodDeclarations.Matches }}
+  {{- range .methodDeclarations.Matches }}
   {{ if .comment }}{{ .comment.Text |indentBlock 2}}{{end -}}
     func {{.receiver.Text}} {{ .name.Text }}{{ .parameters.Text }} {{ .result.Text }}
         {{- if $.with_body }} {{ .body.Text}}{{end}}{{ end -}}
