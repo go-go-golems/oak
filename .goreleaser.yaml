@@ -8,22 +8,22 @@ before:
     - go generate ./...
 
 builds:
-  - id: darwin-arm64
-    main: ./cmd/oak
-    binary: oak
-    goos:
-      - darwin
-    goarch:
-      - arm64
-    env:
-      - PKG_CONFIG_SYSROOT_DIR=/sysroot/macos/arm64
-      - PKG_CONFIG_PATH=/sysroot/macos/arm64/usr/local/lib/pkgconfig
-      - CC=clang
-      - CXX=clang++
-    flags:
-      - -mod=readonly
-    ldflags:
-      - -s -w -X main.version={{.Version}}
+#  - id: darwin-arm64
+#    main: ./cmd/oak
+#    binary: oak
+#    goos:
+#      - darwin
+#    goarch:
+#      - arm64
+#    env:
+#      - PKG_CONFIG_SYSROOT_DIR=/sysroot/macos/arm64
+#      - PKG_CONFIG_PATH=/sysroot/macos/arm64/usr/local/lib/pkgconfig
+#      - CC=clang
+#      - CXX=clang++
+#    flags:
+#      - -mod=readonly
+#    ldflags:
+#      - -s -w -X main.version={{.Version}}
   - id: darwin-amd64
     main: ./cmd/oak
     binary: oak
@@ -74,7 +74,7 @@ brews:
   - name: oak
     description: "oak is a tool"
     homepage: "https://github.com/go-go-golems/oak"
-    tap:
+    repository:
       owner: go-go-golems
       name: homebrew-go-go-go
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"

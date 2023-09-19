@@ -137,7 +137,7 @@ func ExecuteQueries(
 				}
 			}
 
-			m = FilterPredicates(q, m, sourceCode)
+			m = qc.FilterPredicates(m, sourceCode)
 
 			if len(m.Captures) == 0 {
 				continue

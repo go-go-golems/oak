@@ -7,7 +7,7 @@ require (
 	github.com/go-go-golems/clay v0.0.20
 	github.com/go-go-golems/glazed v0.4.0
 	github.com/pkg/errors v0.9.1
-	github.com/smacker/go-tree-sitter v0.0.0-20230415045416-af16b1008751
+	github.com/smacker/go-tree-sitter v0.0.0-20230720070738-0d0a9f78d8f8
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.15.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -84,4 +84,4 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
-replace github.com/smacker/go-tree-sitter => github.com/wesen/go-tree-sitter v0.0.0-20230423204225-a896a22ee48a
+//replace github.com/smacker/go-tree-sitter => github.com/wesen/go-tree-sitter v0.0.0-20230423204225-a896a22ee48a
