@@ -73,7 +73,7 @@ changelog:
 brews:
   - name: oak
     description: "oak is a tool"
-    homepage: "https://github.com/go-go-golems/XXX"
+    homepage: "https://github.com/go-go-golems/oak"
     tap:
       owner: go-go-golems
       name: homebrew-go-go-go
@@ -88,7 +88,7 @@ nfpms:
     maintainer: Manuel Odendahl <wesen@ruinwesen.com>
 
     description: |-
-      XXX is a tool
+      oak is a tool to run tree-sitter queries against a codebase and template format the results.
 
     license: MIT
 
