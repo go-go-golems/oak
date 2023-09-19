@@ -8,7 +8,10 @@ flags:
     default: false
   - name: name
     type: string
-    help: Only output methods and types matching name
+    help: Only output methods with a receiver or types matching name
+  - name: function_name
+    type: string
+    help: Only output methods and functions matching name
   - name: definition_type
     type: stringList
     help: Only output definitions matching types (struct, interface, function, method)
@@ -54,6 +57,7 @@ queries:
         result: (_)? @result
         body: (block) @body)
         {{ if .name }}(#eq? @name "{{.name}}"){{end}}
+        {{ if .function_name }}(#eq? @name "{{.function_name}}"){{end}}
       )
       {{end}}
 
@@ -83,6 +87,7 @@ queries:
         result: (_)? @result
         body: (block) @body)
         {{ if .name }}(#eq? @typeName "{{.name}}"){{end}}
+        {{ if .function_name }}(#eq? @name "{{.function_name}}"){{end}}
         )
       {{end}}
 
