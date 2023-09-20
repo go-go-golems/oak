@@ -19,6 +19,10 @@ flags:
     type: bool
     help: When true, output the function body, else just output the function declaration and parameters
     default: false
+  - name: only_public
+    type: bool
+    help: When true, only output public functions and methods
+    default: false
 
 language: go
 queries:
@@ -32,6 +36,7 @@ queries:
           name: (type_identifier) @structName
           type: (struct_type) @structBody))
         {{ if .name }}(#eq? @structName "{{.name}}"){{end}}
+        {{ if .only_public }}(#match? @structName "^[A-Z]"){{end}}
       )
       {{ end }}
 
@@ -44,6 +49,7 @@ queries:
           name: (type_identifier) @interfaceName
           type: (interface_type) @interfaceBody))
         {{ if .name }}(#eq? @interfaceName "{{.name}}"){{end}}
+        {{ if .only_public }}(#match? @interfaceName "^[A-Z]"){{end}}
       )
       {{ end }}
 
@@ -58,6 +64,7 @@ queries:
         body: (block) @body)
         {{ if .name }}(#eq? @name "{{.name}}"){{end}}
         {{ if .function_name }}(#eq? @name "{{.function_name}}"){{end}}
+        {{ if .only_public }}(#match? @name "^[A-Z]"){{end}}
       )
       {{end}}
 
@@ -88,6 +95,7 @@ queries:
         body: (block) @body)
         {{ if .name }}(#eq? @typeName "{{.name}}"){{end}}
         {{ if .function_name }}(#eq? @name "{{.function_name}}"){{end}}
+        {{ if .only_public }}(#match? @name "^[A-Z]"){{end}}
         )
       {{end}}
 
