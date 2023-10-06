@@ -101,7 +101,10 @@ var runCommandCmd = &cobra.Command{
 		if len(cmds_) != 1 {
 			cobra.CheckErr(fmt.Errorf("expected exactly one command"))
 		}
-		oak := cmds_[0].(*pkg.OakCommand)
+		oak, ok := cmds_[0].(*pkg.OakWriterCommand)
+		if !ok {
+			cobra.CheckErr(fmt.Errorf("expected OakWriterCommand"))
+		}
 
 		for _, inputFile := range args[1:] {
 			sourceCode, err := readFileOrStdin(inputFile)
