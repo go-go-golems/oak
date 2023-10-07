@@ -1,0 +1,60 @@
+name: returns
+short: A simple example to extract return statements in go functions
+
+flags:
+  - name: verbose
+    type: bool
+    help: Output all results
+    default: false
+
+language: go
+queries:
+  - name: nakedReturns
+    query: |
+      (
+       (function_declaration
+        name: (identifier) @functionName
+        result: [
+          (parameter_list
+             (parameter_declaration
+               !name
+               type: (type_identifier)? @resultType))
+        (type_identifier) @resultType
+        (pointer_type) @resultType
+      ]))
+  - name: namedReturns
+    query: |
+      (
+       (function_declaration
+        name: (identifier) @functionName
+        result: (parameter_list
+          (parameter_declaration
+            name: (_) @resultName
+            type: [
+            (type_identifier) @resultType
+            (pointer_type) @resultType
+      ]))))
+
+template: |
+  {{ range $file, $results := .ResultsByFile -}}
+  File: {{ $file }}
+
+  {{ with $results -}}
+  Naked Returns:
+  {{- range .nakedReturns.Matches }}
+    {{ .functionName.Text }} returns {{ .resultType.Text }}
+  {{- end }}
+
+  Named Returns:
+  {{- range .namedReturns.Matches }}
+    {{ .functionName.Text }} returns {{ .resultName.Text }} {{ .resultType.Text }}
+  {{- end }}
+  {{ end -}}
+  {{ end -}}
+
+  {{ if .verbose -}}
+  Results:{{ range $v := .Results }}
+    {{ $v.QueryName }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
+       {{ $captureName }}: {{ $captureValue.Text }}{{ end }}
+    {{end}}{{ end }}
+  {{end -}}
