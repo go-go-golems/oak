@@ -1,0 +1,51 @@
+name: consts
+short: An example to extract go constant specifications
+
+flags:
+  - name: verbose
+    type: bool
+    help: Output all results
+    default: false
+  - name: type
+    type: string
+    help: Only output constant types matching type
+  - name: only_public
+    type: bool
+    help: When true, only output public constants
+    default: false
+  - name: name
+    type: string
+    help: Only output constants matching name
+
+language: go
+queries:
+  - name: constSpecs
+    query: |
+      (
+       (comment)* @comment .
+       (const_spec
+        name: (identifier) @constName
+        type: (type_identifier) @constType
+        value: (expression_list
+          (interpreted_string_literal) @constValue))
+        {{ if .type }}(#eq? @constType "{{.type}}"){{end}}
+        {{ if .name }}(#eq? @constName "{{.name}}"){{end}}
+        {{ if .only_public }}(#match? @constName "^[A-Z]"){{end}}
+      )
+
+template: |
+  {{ range $file, $results := .ResultsByFile -}}
+  File: {{ $file }}
+  {{ with $results -}}
+  {{- range .constSpecs.Matches }}
+  {{ if .comment }}{{ .comment.Text |indentBlock 2}}{{end -}}
+    const {{.constName.Text}} {{ .constType.Text }} = {{ .constValue.Text }}{{ end }}
+  {{ end -}}
+  {{ end -}}
+
+  {{ if .verbose -}}
+  Results:{{ range $v := .Results }}
+    {{ $v.QueryName }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
+       {{ $captureName }}: {{ $captureValue.Text }}{{ end }}
+    {{end}}{{ end }}
+  {{ end -}}
