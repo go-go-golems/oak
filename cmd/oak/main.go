@@ -9,6 +9,7 @@ import (
 	"github.com/go-go-golems/glazed/pkg/cli"
 	"github.com/go-go-golems/glazed/pkg/cmds"
 	glazed_cmds "github.com/go-go-golems/glazed/pkg/cmds"
+	"github.com/go-go-golems/glazed/pkg/cmds/alias"
 	"github.com/go-go-golems/glazed/pkg/cmds/loaders"
 	"github.com/go-go-golems/glazed/pkg/help"
 	"github.com/go-go-golems/oak/pkg"
@@ -18,6 +19,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"io"
 	"os"
+	"path/filepath"
 )
 
 var rootCmd = &cobra.Command{
@@ -39,12 +41,20 @@ func main() {
 		// load the command
 		loader := &pkg.OakCommandLoader{}
 
-		f, err := os.Open(os.Args[2])
+		filePath, err := filepath.Abs(os.Args[2])
 		if err != nil {
-			fmt.Printf("Could not open file: %v\n", err)
+			fmt.Printf("Could not get absolute path: %v\n", err)
 			os.Exit(1)
 		}
-		cmds, err := loader.LoadCommandFromYAML(f)
+		fs_, filePath, err := loaders.FileNameToFsFilePath(filePath)
+		if err != nil {
+			fmt.Printf("Could not get absolute path: %v\n", err)
+			os.Exit(1)
+		}
+		cmds, err := loader.LoadCommands(
+			fs_, filePath,
+			[]glazed_cmds.CommandDescriptionOption{}, []alias.Option{},
+		)
 		if err != nil {
 			fmt.Printf("Could not load command: %v\n", err)
 			os.Exit(1)
@@ -90,13 +100,17 @@ var runCommandCmd = &cobra.Command{
 	Short: "Run a command from a file",
 	Args:  cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		queryFile := args[0]
-		// load queries
-		f, err := os.Open(queryFile)
-		cobra.CheckErr(err)
+		queryFile, err := filepath.Abs(args[0])
+		if err != nil {
+			cobra.CheckErr(err)
+		}
 
 		loader := &pkg.OakCommandLoader{}
-		cmds_, err := loader.LoadCommandFromYAML(f)
+		fs_, queryFile, err := loaders.FileNameToFsFilePath(queryFile)
+		if err != nil {
+			cobra.CheckErr(err)
+		}
+		cmds_, err := loader.LoadCommands(fs_, queryFile, []glazed_cmds.CommandDescriptionOption{}, []alias.Option{})
 		cobra.CheckErr(err)
 		if len(cmds_) != 1 {
 			cobra.CheckErr(fmt.Errorf("expected exactly one command"))
@@ -172,9 +186,8 @@ func initAllCommands(helpSystem *help.HelpSystem) error {
 	}
 
 	oakLoader := &pkg.OakCommandLoader{}
-	yamlFSLoader := loaders.NewYAMLFSCommandLoader(oakLoader)
 	commandLoader := clay_cmds.NewCommandLoader[glazed_cmds.Command](&locations)
-	commands, aliases, err := commandLoader.LoadCommands(yamlFSLoader, helpSystem)
+	commands, aliases, err := commandLoader.LoadCommands(oakLoader, helpSystem)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error initializing commands: %s\n", err)
 		os.Exit(1)
@@ -193,8 +206,7 @@ func initAllCommands(helpSystem *help.HelpSystem) error {
 	rootCmd.AddCommand(glazeCmd)
 
 	oakGlazedLoader := &pkg.OakGlazedCommandLoader{}
-	yamlFSLoader = loaders.NewYAMLFSCommandLoader(oakGlazedLoader)
-	commands, aliases, err = commandLoader.LoadCommands(yamlFSLoader, helpSystem)
+	commands, aliases, err = commandLoader.LoadCommands(oakGlazedLoader, helpSystem)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error initializing commands: %s\n", err)
 		os.Exit(1)

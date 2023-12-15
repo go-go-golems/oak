@@ -23,6 +23,7 @@ import (
 	sitter "github.com/smacker/go-tree-sitter"
 	"gopkg.in/yaml.v3"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -80,10 +81,36 @@ type OakCommandDescription struct {
 type OakCommandLoader struct {
 }
 
-func (o *OakCommandLoader) LoadCommandFromYAML(
-	s io.Reader,
-	options ...cmds.CommandDescriptionOption,
+func (o *OakCommandLoader) IsFileSupported(f fs.FS, fileName string) bool {
+	return strings.HasSuffix(fileName, ".yaml") || strings.HasSuffix(fileName, ".yml")
+}
+
+var _ loaders.CommandLoader = (*OakCommandLoader)(nil)
+
+func (o *OakCommandLoader) LoadCommands(
+	f fs.FS, entryName string,
+	options []cmds.CommandDescriptionOption,
+	aliasOptions []alias.Option,
 ) ([]cmds.Command, error) {
+	s, err := f.Open(entryName)
+	if err != nil {
+		return nil, err
+	}
+	defer func(r fs.File) {
+		_ = r.Close()
+	}(s)
+
+	return loaders.LoadCommandOrAliasFromReader(
+		s,
+		o.loadCommandFromReader,
+		options,
+		aliasOptions)
+
+}
+
+func (o *OakCommandLoader) loadCommandFromReader(
+	s io.Reader, options []cmds.CommandDescriptionOption,
+	_ []alias.Option) ([]cmds.Command, error) {
 	ocd := &OakCommandDescription{}
 	err := yaml.NewDecoder(s).Decode(ocd)
 	if err != nil {
@@ -611,9 +638,36 @@ func NewOakGlazedCommand(d *cmds.CommandDescription, options ...OakCommandOption
 
 type OakGlazedCommandLoader struct{}
 
-func (o *OakGlazedCommandLoader) LoadCommandFromYAML(
+func (o *OakGlazedCommandLoader) IsFileSupported(f fs.FS, fileName string) bool {
+	return strings.HasSuffix(fileName, ".yaml") || strings.HasSuffix(fileName, ".yml")
+}
+
+var _ loaders.CommandLoader = (*OakGlazedCommandLoader)(nil)
+
+func (o *OakGlazedCommandLoader) LoadCommands(
+	f fs.FS, entryName string,
+	options []cmds.CommandDescriptionOption,
+	aliasOptions []alias.Option,
+) ([]cmds.Command, error) {
+	r, err := f.Open(entryName)
+	if err != nil {
+		return nil, err
+	}
+	defer func(r fs.File) {
+		_ = r.Close()
+	}(r)
+
+	return loaders.LoadCommandOrAliasFromReader(
+		r,
+		o.loadCommandFromReader,
+		options,
+		aliasOptions)
+}
+
+func (o *OakGlazedCommandLoader) loadCommandFromReader(
 	s io.Reader,
-	options ...cmds.CommandDescriptionOption,
+	options []cmds.CommandDescriptionOption,
+	_ []alias.Option,
 ) ([]cmds.Command, error) {
 	ocd := &OakCommandDescription{}
 	err := yaml.NewDecoder(s).Decode(ocd)
