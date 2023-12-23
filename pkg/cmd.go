@@ -13,7 +13,6 @@ import (
 	"github.com/go-go-golems/glazed/pkg/cmds/layout"
 	"github.com/go-go-golems/glazed/pkg/cmds/loaders"
 	"github.com/go-go-golems/glazed/pkg/cmds/parameters"
-	"github.com/go-go-golems/glazed/pkg/helpers/cast"
 	"github.com/go-go-golems/glazed/pkg/helpers/compare"
 	"github.com/go-go-golems/glazed/pkg/helpers/templating"
 	"github.com/go-go-golems/glazed/pkg/middlewares"
@@ -36,6 +35,14 @@ var oakLayerYaml string
 
 type OakParameterLayer struct {
 	layers.ParameterLayerImpl `yaml:",inline"`
+}
+
+const OakSlug = "oak"
+
+type OakSettings struct {
+	Recurse      bool     `glazed.parameter:"recurse"`
+	PrintQueries bool     `glazed.parameter:"print-queries"`
+	Glob         []string `glazed.parameter:"glob"`
 }
 
 func NewOakParameterLayer(
@@ -325,7 +332,7 @@ func printNode(n *sitter.Node, depth int, name string) {
 //
 // WARNING: This is destructive and should only be called once.
 // NOTE(manuel, 2023-06-19) This is not a great API, but it will do for now.
-func (oc *OakCommand) RenderQueries(layers *layers.ParsedParameterLayers) error {
+func (oc *OakCommand) RenderQueries(layers *layers.ParsedLayers) error {
 	ps := layers.GetDataMap()
 	for idx, query := range oc.Queries {
 		// we're ignoring the query because we want the index only, since we are not dealing with pointers
@@ -436,18 +443,26 @@ func NewOakWriterCommand(d *cmds.CommandDescription, options ...OakCommandOption
 
 func (oc *OakWriterCommand) RunIntoWriter(
 	ctx context.Context,
-	parsedLayers *layers.ParsedParameterLayers,
+	parsedLayers *layers.ParsedLayers,
 	w io.Writer,
 ) error {
-	err := oc.RenderQueries(parsedLayers)
+	s := &RunSettings{}
+	err := parsedLayers.InitializeStruct(layers.DefaultSlug, s)
+	if err != nil {
+		return err
+	}
+	ss := &OakSettings{}
+	err = parsedLayers.InitializeStruct(OakSlug, ss)
 	if err != nil {
 		return err
 	}
 
-	d := parsedLayers.GetDefaultParameterLayer()
+	err = oc.RenderQueries(parsedLayers)
+	if err != nil {
+		return err
+	}
 
-	printQueries, ok := d.Parameters.Get("print-queries")
-	if ok && printQueries.Value.(bool) {
+	if ss.PrintQueries {
 		err := oc.PrintQueries(w)
 		if err != nil {
 			return err
@@ -455,24 +470,11 @@ func (oc *OakWriterCommand) RunIntoWriter(
 		return nil
 	}
 
-	sources, ok := d.Parameters.Get("sources")
-	if !ok {
-		return errors.New("no sources provided")
-	}
-	sources_, ok := cast.CastList2[string, interface{}](sources)
-	if !ok {
-		return errors.New("sources must be a list of strings")
-	}
+	sources_ := s.Sources
 
-	oakLayer, ok := parsedLayers.Get("oak")
-	if !ok {
-		return errors.New("no oak layer found")
-	}
-	recurse := oakLayer.Parameters.GetValue("recurse").(bool)
-	glob := oakLayer.Parameters.GetValue("glob")
-	glob_, _ := cast.CastList2[string, interface{}](glob)
+	glob_ := ss.Glob
 
-	if recurse && len(glob_) == 0 {
+	if ss.Recurse && len(glob_) == 0 {
 		// use standard globs for the language of the command
 		glob_, err = GetLanguageGlobs(oc.Language)
 		if err != nil {
@@ -518,11 +520,11 @@ func (oc *OakWriterCommand) RunIntoWriter(
 		return err
 	}
 
-	s := buf.String()
+	s_ := buf.String()
 	// trim left and right
-	s = strings.TrimSpace(s) + "\n"
+	s_ = strings.TrimSpace(s_) + "\n"
 
-	_, err = w.Write(([]byte)(s))
+	_, err = w.Write(([]byte)(s_))
 	if err != nil {
 		return err
 	}
@@ -536,19 +538,32 @@ type OakGlazeCommand struct {
 
 var _ cmds.GlazeCommand = (*OakGlazeCommand)(nil)
 
+type RunSettings struct {
+	Sources []string
+}
+
 func (oc *OakGlazeCommand) RunIntoGlazeProcessor(
 	ctx context.Context,
-	parsedLayers *layers.ParsedParameterLayers,
+	parsedLayers *layers.ParsedLayers,
 	gp middlewares.Processor,
 ) error {
-	err := oc.RenderQueries(parsedLayers)
+	s := &RunSettings{}
+	err := parsedLayers.InitializeStruct(layers.DefaultSlug, s)
+	if err != nil {
+		return err
+	}
+	ss := &OakSettings{}
+	err = parsedLayers.InitializeStruct(OakSlug, ss)
 	if err != nil {
 		return err
 	}
 
-	d := parsedLayers.GetDefaultParameterLayer()
-	printQueries, ok := d.Parameters.Get("print-queries")
-	if ok && printQueries.Value.(bool) {
+	err = oc.RenderQueries(parsedLayers)
+	if err != nil {
+		return err
+	}
+
+	if ss.PrintQueries {
 		for _, q := range oc.Queries {
 			v := types.NewRow(
 				types.MRP("query", q.Query),
@@ -563,31 +578,15 @@ func (oc *OakGlazeCommand) RunIntoGlazeProcessor(
 		return nil
 	}
 
-	sources, ok := d.Parameters.Get("sources")
-	if !ok {
-		return errors.New("no sources provided")
-	}
-	sources_, ok := cast.CastList2[string, interface{}](sources)
-	if !ok {
-		return errors.New("sources must be a list of strings")
-	}
-
-	oakLayer, ok := parsedLayers.Get("oak")
-	if !ok {
-		return errors.New("no oak layer found")
-	}
-	recurse := oakLayer.Parameters.GetValue("recurse").(bool)
-	glob := oakLayer.Parameters.GetValue("glob")
-	glob_, _ := cast.CastList2[string, interface{}](glob)
-
-	if recurse && len(glob_) == 0 {
+	glob_ := ss.Glob
+	if ss.Recurse && len(glob_) == 0 {
 		// use standard globs for the language of the command
 		glob_, err = GetLanguageGlobs(oc.Language)
 		if err != nil {
 			return err
 		}
 	}
-	sources_, err = collectSources(sources_, glob_)
+	sources_, err := collectSources(s.Sources, glob_)
 	if err != nil {
 		return err
 	}
