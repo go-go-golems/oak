@@ -129,14 +129,14 @@ func (o *OakCommandLoader) loadCommandFromReader(
 		return nil, err
 	}
 
-	layers := append(ocd.Layers, oakLayer)
+	layers_ := append(ocd.Layers, oakLayer)
 
 	options_ := []cmds.CommandDescriptionOption{
 		cmds.WithName(ocd.Name),
 		cmds.WithShort(ocd.Short),
 		cmds.WithLong(ocd.Long),
 		cmds.WithFlags(ocd.Flags...),
-		cmds.WithLayers(layers...),
+		cmds.WithLayersList(layers_...),
 		cmds.WithArguments(
 			parameters.NewParameterDefinition(
 				"sources",
@@ -695,7 +695,7 @@ func (o *OakGlazedCommandLoader) loadCommandFromReader(
 		cmds.WithShort(ocd.Short),
 		cmds.WithLong(ocd.Long),
 		cmds.WithFlags(ocd.Flags...),
-		cmds.WithLayers(layers...),
+		cmds.WithLayersList(layers...),
 		cmds.WithArguments(
 			parameters.NewParameterDefinition(
 				"sources",
