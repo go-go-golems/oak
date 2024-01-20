@@ -5,13 +5,17 @@ import (
 	"embed"
 	"fmt"
 	clay "github.com/go-go-golems/clay/pkg"
-	clay_cmds "github.com/go-go-golems/clay/pkg/cmds"
+	ls_commands "github.com/go-go-golems/clay/pkg/cmds/ls-commands"
+	"github.com/go-go-golems/clay/pkg/repositories"
+	"github.com/go-go-golems/clay/pkg/sql"
 	"github.com/go-go-golems/glazed/pkg/cli"
 	"github.com/go-go-golems/glazed/pkg/cmds"
 	glazed_cmds "github.com/go-go-golems/glazed/pkg/cmds"
 	"github.com/go-go-golems/glazed/pkg/cmds/alias"
+	"github.com/go-go-golems/glazed/pkg/cmds/layers"
 	"github.com/go-go-golems/glazed/pkg/cmds/loaders"
 	"github.com/go-go-golems/glazed/pkg/help"
+	"github.com/go-go-golems/glazed/pkg/types"
 	"github.com/go-go-golems/oak/pkg"
 	sitter "github.com/smacker/go-tree-sitter"
 	"github.com/spf13/cobra"
@@ -165,39 +169,56 @@ func initRootCmd() (*help.HelpSystem, error) {
 }
 
 func initAllCommands(helpSystem *help.HelpSystem) error {
-	repositories := viper.GetStringSlice("repositories")
+	repositoryPaths := viper.GetStringSlice("repositories")
 
 	defaultDirectory := "$HOME/.oak/queries"
 	_, err := os.Stat(os.ExpandEnv(defaultDirectory))
 	if err == nil {
-		repositories = append(repositories, os.ExpandEnv(defaultDirectory))
+		repositoryPaths = append(repositoryPaths, os.ExpandEnv(defaultDirectory))
 	}
 
-	locations := clay_cmds.CommandLocations{
-		Embedded: []clay_cmds.EmbeddedCommandLocation{
-			{
-				FS:      queriesFS,
-				Name:    "oak",
-				Root:    "queries",
-				DocRoot: "queries/doc",
-			},
-		},
-		Repositories: repositories,
-	}
+	loader := &pkg.OakCommandLoader{}
+	repositories_ := createRepositories(repositoryPaths, loader)
 
-	oakLoader := &pkg.OakCommandLoader{}
-	commandLoader := clay_cmds.NewCommandLoader[glazed_cmds.Command](&locations)
-	commands, aliases, err := commandLoader.LoadCommands(oakLoader, helpSystem)
+	allCommands, err := repositories.LoadRepositories(
+		helpSystem,
+		rootCmd,
+		repositories_,
+		cli.WithCobraShortHelpLayers(layers.DefaultSlug, pkg.OakSlug),
+	)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error initializing commands: %s\n", err)
-		os.Exit(1)
+		return err
 	}
 
-	err = cli.AddCommandsToRootCommand(rootCmd, commands, aliases)
+	lsCommandsCommand, err := ls_commands.NewListCommandsCommand(allCommands,
+		ls_commands.WithCommandDescriptionOptions(
+			glazed_cmds.WithShort("Commands related to sqleton queries"),
+		),
+		ls_commands.WithAddCommandToRowFunc(func(
+			command glazed_cmds.Command,
+			row types.Row,
+			parsedLayers *layers.ParsedLayers,
+		) ([]types.Row, error) {
+			ret := []types.Row{row}
+			switch c := command.(type) {
+			case *pkg.OakCommand:
+				row.Set("language", c.Language)
+				row.Set("queries", c.Queries)
+				row.Set("type", "oak")
+			default:
+			}
+
+			return ret, nil
+		}),
+	)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error initializing commands: %s\n", err)
-		os.Exit(1)
+		return err
 	}
+	cobraQueriesCommand, err := sql.BuildCobraCommandWithSqletonMiddlewares(lsCommandsCommand)
+	if err != nil {
+		return err
+	}
+	rootCmd.AddCommand(cobraQueriesCommand)
 
 	glazeCmd := &cobra.Command{
 		Use:   "glaze",
@@ -206,18 +227,53 @@ func initAllCommands(helpSystem *help.HelpSystem) error {
 	rootCmd.AddCommand(glazeCmd)
 
 	oakGlazedLoader := &pkg.OakGlazedCommandLoader{}
-	commands, aliases, err = commandLoader.LoadCommands(oakGlazedLoader, helpSystem)
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error initializing commands: %s\n", err)
-		os.Exit(1)
-	}
+	repositories_ = createRepositories(repositoryPaths, oakGlazedLoader)
 
-	err = cli.AddCommandsToRootCommand(glazeCmd, commands, aliases)
+	_, err = repositories.LoadRepositories(
+		helpSystem,
+		glazeCmd,
+		repositories_,
+		cli.WithCobraShortHelpLayers(layers.DefaultSlug, pkg.OakSlug),
+	)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error initializing commands: %s\n", err)
-		os.Exit(1)
+		return err
 	}
 	return nil
+}
+
+func createRepositories(repositoryPaths []string, loader loaders.CommandLoader) []*repositories.Repository {
+	directories := []repositories.Directory{
+		{
+			FS:               queriesFS,
+			RootDirectory:    "queries",
+			RootDocDirectory: "queries/doc",
+			Name:             "oak",
+			SourcePrefix:     "embed",
+		}}
+
+	for _, repositoryPath := range repositoryPaths {
+		dir := os.ExpandEnv(repositoryPath)
+		// check if dir exists
+		if fi, err := os.Stat(dir); os.IsNotExist(err) || !fi.IsDir() {
+			continue
+		}
+		directories = append(directories, repositories.Directory{
+			FS:               os.DirFS(dir),
+			RootDirectory:    ".",
+			RootDocDirectory: "doc",
+			Directory:        dir,
+			Name:             dir,
+			SourcePrefix:     "file",
+		})
+	}
+
+	repositories_ := []*repositories.Repository{
+		repositories.NewRepository(
+			repositories.WithDirectories(directories...),
+			repositories.WithCommandLoader(loader),
+		),
+	}
+	return repositories_
 }
 
 func registerLegacyCommands() {

@@ -59,9 +59,9 @@ func NewOakParameterLayer(
 
 type SitterQuery struct {
 	// Name of the resulting variable after parsing
-	Name string
+	Name string `yaml:"name"`
 	// Query contains the tree-sitter query that will be applied to the source code
-	Query string
+	Query string `yaml:"query"`
 	// rendered keeps track if the Query was rendered with RenderQueries.
 	// This is an ugly way of doing things, but at least we'll signal at runtime
 	// if the code tries to render a query multiple times.
