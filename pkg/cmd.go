@@ -539,7 +539,7 @@ type OakGlazeCommand struct {
 var _ cmds.GlazeCommand = (*OakGlazeCommand)(nil)
 
 type RunSettings struct {
-	Sources []string
+	Sources []string `glazed.parameter:"sources"`
 }
 
 func (oc *OakGlazeCommand) RunIntoGlazeProcessor(
