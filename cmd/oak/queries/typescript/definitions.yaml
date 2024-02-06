@@ -1,0 +1,95 @@
+name: definitions
+short: Extract TypeScript constant definitions using export const
+# Created with chatgpt
+# https://chat.openai.com/share/bf81616c-792b-45fc-9a74-667cd656dc14
+flags:
+  - name: verbose
+    type: bool
+    help: Output all results
+    default: false
+  - name: name
+    type: string
+    help: Only output constants matching name
+  - name: with_body
+    type: bool
+    help: When true, output the constant value, else just output the constant declaration
+    default: false
+  - name: list
+    type: bool
+    help: When true, output the list of constant names
+    default: false
+  - name: with_comments
+    type: bool
+    help: When true, output the comments, else ignore them
+    default: false
+  - name: count
+    type: int
+    help: Limit the number of constants to output
+    default: 0
+  - name: offset
+    type: int
+    help: Offset the number of constants to output
+    default: 0
+
+language: tsx
+queries:
+  - name: exportConstDeclarations
+    query: |
+      (
+        (comment)* @comment .
+        (export_statement
+          (lexical_declaration
+            (variable_declarator
+              name: (identifier) @name
+              value: (_)? @constValue
+            )
+          )
+        )
+        {{ if .name }}(#eq? @name "{{.name}}"){{end}}
+      )
+
+template: |
+  {{ $skipLimit := (and (eq $.count 0) (eq $.offset 0)) }}
+  {{ range $file, $results := .ResultsByFile }}
+  {{ $hasResults := 
+     (and 
+       (gt (len $.ResultsByFile) 1)
+       (gt (len $results.exportConstDeclarations.Matches) 0)
+      )
+  }}
+  {{ if  $hasResults -}}File: {{ $file }}{{ end }}
+  {{ with $results -}}
+  {{ if $.list -}}
+    {{- $count := 0 }}
+    {{- range .exportConstDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
+  - {{ .name.Text }}
+    {{- end }}
+    {{- $count = add $count 1 }}
+    {{- end }}
+  {{- else -}}
+    {{- $count := 0 }}
+    {{- range .exportConstDeclarations.Matches -}}
+    {{ $gt := (gt (add $count 1) $.offset) -}}
+    {{ $lt := (or (eq $.count 0) (lt $count (add $.offset $.count))) -}}
+    {{ $and := (and $gt $lt) -}}
+    {{- if or $skipLimit $and }}
+    {{- if and .comment $.with_comments }}{{ .comment.Text |indentBlock 2}}{{end}}
+  export const {{ .name.Text }} = {{ if $.with_body }}{{ .constValue.Text }}{{ end }}
+    {{- end }}
+    {{- $count = add $count 1 }}
+    {{- end }}
+  {{ end -}}
+  {{ end }}
+  {{ end }}
+  
+  {{ if .verbose -}}
+  
+  Results:{{ range $v := .Results }}
+    {{ $v.QueryName }}: {{ range $match := $v.Matches }}{{ range $captureName, $captureValue := $match }}
+       {{ $captureName }}: {{ $captureValue.Text }}{{ end }}
+    {{end}}{{ end }}
+  {{ end -}}
