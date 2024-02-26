@@ -38,13 +38,20 @@ queries:
       (
         (comment)* @comment .
         (export_statement
-          (lexical_declaration
-            (variable_declarator
-              name: (identifier) @name
-              value: (_)? @constValue
+          [
+            (lexical_declaration
+              (variable_declarator
+                name: (identifier) @name
+                value: (_)? @constValue
+              )
             )
+          (class_declaration
+            name: (type_identifier) @name
+            (class_heritage)? @heritage
+            (class_body) @constValue
+            )
+        ]
           )
-        )
         {{ if .name }}(#eq? @name "{{.name}}"){{end}}
       )
 
@@ -78,7 +85,7 @@ template: |
     {{ $and := (and $gt $lt) -}}
     {{- if or $skipLimit $and }}
     {{- if and .comment $.with_comments }}{{ .comment.Text |indentBlock 2}}{{end}}
-  export const {{ .name.Text }} = {{ if $.with_body }}{{ .constValue.Text }}{{ end }}
+  export const {{ .name.Text }} {{if .heritage }}{{.heritage.Text}}{{end}} = {{ if $.with_body }}{{ .constValue.Text }}{{ end }}
     {{- end }}
     {{- $count = add $count 1 }}
     {{- end }}

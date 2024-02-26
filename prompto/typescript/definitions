@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+# Script to call oak with typescript definitions/types and optional --with-body flag
+
+usage() {
+    echo "Usage: $0 [--with-body] <file1> [file2] ..."
+    echo
+    echo "Options:"
+    echo "  --with-body    Include body in the typescript definitions."
+    echo
+    echo "Arguments:"
+    echo "  file1, file2, ...    One or more filenames to process with oak."
+    echo
+    echo "Example:"
+    echo "  $0 --with-body file1.ts file2.ts"
+    echo "  $0 file1.ts file2.ts"
+}
+
+# Check if no arguments were provided
+if [ $# -eq 0 ]; then
+    usage
+    exit 1
+fi
+
+# Initialize an empty array to store filenames
+filenames=()
+
+# Initialize a variable to store the flag status
+with_body=false
+
+for arg in "$@"
+do
+    if [[ $arg == "--with-body" ]]; then
+        with_body=true
+    elif [[ $arg == "-h" ]] || [[ $arg == "--help" ]]; then
+        usage
+        exit 0
+    else
+        filenames+=("$arg")
+    fi
+done
+
+# Check if filenames are provided
+if [ ${#filenames[@]} -eq 0 ]; then
+    echo "Error: No filenames provided."
+    usage
+    exit 1
+fi
+
+echo "Types and definitions in ${filenames[@]}"
+
+oak typescript types "${filenames[@]}"
+
+echo
+echo
+
+if [ "$with_body" = true ]; then
+    oak typescript definitions --with-body "${filenames[@]}"
+else
+    oak typescript definitions "${filenames[@]}"
+fi
