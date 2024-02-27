@@ -7,6 +7,8 @@ usage() {
     echo
     echo "Options:"
     echo "  --with-body    Include body in the typescript definitions."
+    echo "  --with-comments    Include comments in the typescript definitions."
+    echo "  --with-private     Include private definitions"
     echo
     echo "Arguments:"
     echo "  file1, file2, ...    One or more filenames to process with oak."
@@ -27,11 +29,17 @@ filenames=()
 
 # Initialize a variable to store the flag status
 with_body=false
+with_comments=false
+with_private=false
 
 for arg in "$@"
 do
     if [[ $arg == "--with-body" ]]; then
         with_body=true
+    elif [[ $arg == "--with-comments" ]]; then
+        with_comments=true
+    elif [[ $arg == "--with-private" ]]; then
+        with_private=true
     elif [[ $arg == "-h" ]] || [[ $arg == "--help" ]]; then
         usage
         exit 0
@@ -54,8 +62,16 @@ oak typescript types "${filenames[@]}"
 echo
 echo
 
+# make a list of flags to pass typescript definitions based on with_body and with_comments
+flags=()
 if [ "$with_body" = true ]; then
-    oak typescript definitions --with-body "${filenames[@]}"
-else
-    oak typescript definitions "${filenames[@]}"
+    flags+=("--with-body")
 fi
+if [ "$with_comments" = true ]; then
+    flags+=("--with-comments")
+fi
+if [ "$with_private" = true ]; then
+    flags+=("--with-private")
+fi
+
+echo oak typescript definitions "${flags[@]}" "${filenames[@]}"

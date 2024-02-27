@@ -60,9 +60,7 @@ queries:
             value: (arrow_function
               parameters: (formal_parameters)? @parameters
               body: (statement_block)? @body)))
-      {{- if not $.with_private -}}
-      )
-      {{ end -}}
+      {{- if not $.with_private -}} ) {{ end -}}
         {{ if .function }}(#eq? @functionName "{{.function}}"){{end}}
       )
 
@@ -118,7 +116,7 @@ template: |
     {{ $and := (and $gt $lt) -}}
     {{- if or $skipLimit $and }}
     {{- if and .comment $.with_comments }}{{ .comment.Text | indentBlock 2}}{{end}}
-  export const {{ .functionName.Text }} = {{ .parameters.Text }} => {{ if $.with_body }}{{ .body.Text }}{{ end }}
+  export const {{ .functionName.Text }} = {{ .parameters.Text }}{{ if $.with_body }} => {{ .body.Text }}{{ end }}
     {{- end }}
     {{- $count = add $count 1 }}
     {{- end }}

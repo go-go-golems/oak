@@ -18,6 +18,10 @@ flags:
     type: bool
     help: When true, output the list of constant names
     default: false
+  - name: with_private
+    type: bool
+    help: When true, output private constants as well
+    default: false
   - name: with_comments
     type: bool
     help: When true, output the comments, else ignore them
@@ -34,25 +38,35 @@ flags:
 language: tsx
 queries:
   - name: exportConstDeclarations
+    # this will match arrow function consts twice, as we match both the arrow_function and the _.
+    # Not sure how this can be solved, but we already know that this matching language is not great.
     query: |
+      (program
       (
         (comment)* @comment .
-        (export_statement
+       {{ if not $.with_private -}}
+       (export_statement
+       {{ end -}}
           [
+            (function_declaration
+                name: (identifier) @name
+                parameters: (_) @parameters
+                body: (_)? @constValue
+            )
             (lexical_declaration
               (variable_declarator
                 name: (identifier) @name
-                value: (_)? @constValue
-              )
-            )
+                value: (_) @constValue
+            ))
           (class_declaration
             name: (type_identifier) @name
             (class_heritage)? @heritage
             (class_body) @constValue
             )
         ]
-          )
+      {{- if not $.with_private -}} ) {{ end -}}
         {{ if .name }}(#eq? @name "{{.name}}"){{end}}
+      )
       )
 
 template: |
@@ -85,7 +99,7 @@ template: |
     {{ $and := (and $gt $lt) -}}
     {{- if or $skipLimit $and }}
     {{- if and .comment $.with_comments }}{{ .comment.Text |indentBlock 2}}{{end}}
-  export const {{ .name.Text }} {{if .heritage }}{{.heritage.Text}}{{end}} = {{ if $.with_body }}{{ .constValue.Text }}{{ end }}
+  export const {{ .name.Text }} {{if .parameters}}{{.parameters.Text}}{{end}}{{if .heritage }}{{.heritage.Text}}{{end}} {{ if $.with_body }}= {{ .constValue.Text  }}{{ end }}
     {{- end }}
     {{- $count = add $count 1 }}
     {{- end }}
