@@ -41,7 +41,6 @@ queries:
     # this will match arrow function consts twice, as we match both the arrow_function and the _.
     # Not sure how this can be solved, but we already know that this matching language is not great.
     query: |
-      (program
       (
         (comment)* @comment .
        {{ if not $.with_private -}}
@@ -52,11 +51,17 @@ queries:
                 name: (identifier) @name
                 parameters: (_) @parameters
                 body: (_)? @constValue
+               
             )
             (lexical_declaration
               (variable_declarator
                 name: (identifier) @name
-                value: (_) @constValue
+                value: [
+                  (_ !parameters) @constValue
+                  (arrow_function
+                     parameters: (formal_parameters)? @parameters
+                     body: (statement_block)? @body)?
+                ]
             ))
           (class_declaration
             name: (type_identifier) @name
@@ -66,7 +71,6 @@ queries:
         ]
       {{- if not $.with_private -}} ) {{ end -}}
         {{ if .name }}(#eq? @name "{{.name}}"){{end}}
-      )
       )
 
 template: |
