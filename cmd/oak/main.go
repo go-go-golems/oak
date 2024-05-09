@@ -261,8 +261,8 @@ func createRepositories(repositoryPaths []string, loader loaders.CommandLoader) 
 			FS:               os.DirFS(dir),
 			RootDirectory:    ".",
 			RootDocDirectory: "doc",
-			Directory:        dir,
 			Name:             dir,
+			WatchDirectory:   dir,
 			SourcePrefix:     "file",
 		})
 	}
