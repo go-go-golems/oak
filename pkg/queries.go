@@ -108,7 +108,7 @@ func ExecuteQueries(
 		if err != nil {
 			switch err := err.(type) {
 			case *sitter.QueryError:
-				return nil, errors.Errorf("error parsing query %s: '%v'", query.Name, err.Error())
+				return nil, errors.Wrap(err, "error parsing query %s")
 			}
 			return nil, err
 		}
