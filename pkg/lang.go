@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"github.com/smacker/go-tree-sitter"
 	"github.com/smacker/go-tree-sitter/bash"
 	"github.com/smacker/go-tree-sitter/c"
@@ -95,7 +96,7 @@ func LanguageNameToSitterLanguage(name string) (*sitter.Language, error) {
 	case "yaml":
 		return yaml.GetLanguage(), nil
 	default:
-		return nil, fmt.Errorf("unsupported language name: %s", name)
+		return nil, errors.Errorf("unsupported language name: %s", name)
 	}
 }
 
@@ -150,7 +151,7 @@ func GetLanguageGlobs(lang string) ([]string, error) {
 	}
 
 	if len(ret) == 0 {
-		return nil, fmt.Errorf("unsupported language name: %s", lang)
+		return nil, errors.Errorf("unsupported language name: %s", lang)
 	} else {
 		return ret, nil
 	}
@@ -168,5 +169,5 @@ func FileNameToSitterLanguage(filename string) (*sitter.Language, error) {
 			return LanguageNameToSitterLanguage(name[0])
 		}
 	}
-	return nil, fmt.Errorf("unsupported file name: %s", filename)
+	return nil, errors.Errorf("unsupported file name: %s", filename)
 }

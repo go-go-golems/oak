@@ -17,6 +17,7 @@ import (
 	"github.com/go-go-golems/glazed/pkg/help"
 	"github.com/go-go-golems/glazed/pkg/types"
 	"github.com/go-go-golems/oak/pkg"
+	"github.com/pkg/errors"
 	sitter "github.com/smacker/go-tree-sitter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -117,11 +118,11 @@ var runCommandCmd = &cobra.Command{
 		cmds_, err := loader.LoadCommands(fs_, queryFile, []glazed_cmds.CommandDescriptionOption{}, []alias.Option{})
 		cobra.CheckErr(err)
 		if len(cmds_) != 1 {
-			cobra.CheckErr(fmt.Errorf("expected exactly one command"))
+			cobra.CheckErr(errors.New("expected exactly one command"))
 		}
 		oak, ok := cmds_[0].(*pkg.OakWriterCommand)
 		if !ok {
-			cobra.CheckErr(fmt.Errorf("expected OakWriterCommand"))
+			cobra.CheckErr(errors.New("expected OakWriterCommand"))
 		}
 
 		for _, inputFile := range args[1:] {
