@@ -17,6 +17,8 @@ import (
 	"github.com/go-go-golems/glazed/pkg/help"
 	"github.com/go-go-golems/glazed/pkg/types"
 	"github.com/go-go-golems/oak/pkg"
+	cmds2 "github.com/go-go-golems/oak/pkg/cmds"
+	"github.com/go-go-golems/oak/pkg/tree-sitter"
 	"github.com/pkg/errors"
 	sitter "github.com/smacker/go-tree-sitter"
 	"github.com/spf13/cobra"
@@ -44,7 +46,7 @@ func main() {
 	// we need to do this before cobra, because we don't know which flags to load yet
 	if len(os.Args) >= 3 && os.Args[1] == "run" && os.Args[2] != "--help" {
 		// load the command
-		loader := &pkg.OakCommandLoader{}
+		loader := &cmds2.OakCommandLoader{}
 
 		filePath, err := filepath.Abs(os.Args[2])
 		if err != nil {
@@ -110,7 +112,7 @@ var runCommandCmd = &cobra.Command{
 			cobra.CheckErr(err)
 		}
 
-		loader := &pkg.OakCommandLoader{}
+		loader := &cmds2.OakCommandLoader{}
 		fs_, queryFile, err := loaders.FileNameToFsFilePath(queryFile)
 		if err != nil {
 			cobra.CheckErr(err)
@@ -120,7 +122,7 @@ var runCommandCmd = &cobra.Command{
 		if len(cmds_) != 1 {
 			cobra.CheckErr(errors.New("expected exactly one command"))
 		}
-		oak, ok := cmds_[0].(*pkg.OakWriterCommand)
+		oak, ok := cmds_[0].(*cmds2.OakWriterCommand)
 		if !ok {
 			cobra.CheckErr(errors.New("expected OakWriterCommand"))
 		}
@@ -178,14 +180,14 @@ func initAllCommands(helpSystem *help.HelpSystem) error {
 		repositoryPaths = append(repositoryPaths, os.ExpandEnv(defaultDirectory))
 	}
 
-	loader := &pkg.OakCommandLoader{}
+	loader := &cmds2.OakCommandLoader{}
 	repositories_ := createRepositories(repositoryPaths, loader)
 
 	allCommands, err := repositories.LoadRepositories(
 		helpSystem,
 		rootCmd,
 		repositories_,
-		cli.WithCobraShortHelpLayers(layers.DefaultSlug, pkg.OakSlug),
+		cli.WithCobraShortHelpLayers(layers.DefaultSlug, cmds2.OakSlug),
 	)
 	if err != nil {
 		return err
@@ -202,7 +204,7 @@ func initAllCommands(helpSystem *help.HelpSystem) error {
 		) ([]types.Row, error) {
 			ret := []types.Row{row}
 			switch c := command.(type) {
-			case *pkg.OakCommand:
+			case *cmds2.OakCommand:
 				row.Set("language", c.Language)
 				row.Set("queries", c.Queries)
 				row.Set("type", "oak")
@@ -227,14 +229,14 @@ func initAllCommands(helpSystem *help.HelpSystem) error {
 	}
 	rootCmd.AddCommand(glazeCmd)
 
-	oakGlazedLoader := &pkg.OakGlazedCommandLoader{}
+	oakGlazedLoader := &cmds2.OakGlazedCommandLoader{}
 	repositories_ = createRepositories(repositoryPaths, oakGlazedLoader)
 
 	_, err = repositories.LoadRepositories(
 		helpSystem,
 		glazeCmd,
 		repositories_,
-		cli.WithCobraShortHelpLayers(layers.DefaultSlug, pkg.OakSlug),
+		cli.WithCobraShortHelpLayers(layers.DefaultSlug, cmds2.OakSlug),
 	)
 	if err != nil {
 		return err
@@ -310,13 +312,13 @@ func registerLegacyCommands() {
 
 				description := cmds.NewCommandDescription("query")
 
-				oak := pkg.NewOakWriterCommand(description,
-					pkg.WithQueries(pkg.SitterQuery{
+				oak := cmds2.NewOakWriterCommand(description,
+					cmds2.WithQueries(tree_sitter.SitterQuery{
 						Name:  queryName,
 						Query: string(query),
 					}),
-					pkg.WithSitterLanguage(lang),
-					pkg.WithTemplate(templateFile))
+					cmds2.WithSitterLanguage(lang),
+					cmds2.WithTemplate(templateFile))
 
 				sourceCode, err := readFileOrStdin(inputFile)
 				cobra.CheckErr(err)
@@ -385,10 +387,10 @@ func registerLegacyCommands() {
 
 				description := cmds.NewCommandDescription("parse")
 
-				oak := pkg.NewOakWriterCommand(
+				oak := cmds2.NewOakWriterCommand(
 					description,
-					pkg.WithSitterLanguage(lang),
-					pkg.WithTemplate(templateFile))
+					cmds2.WithSitterLanguage(lang),
+					cmds2.WithTemplate(templateFile))
 
 				sourceCode, err := readFileOrStdin(inputFile)
 				cobra.CheckErr(err)
