@@ -1,0 +1,1 @@
+- [ ] Use the filefilter from clay to filter files
