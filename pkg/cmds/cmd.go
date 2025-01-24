@@ -6,6 +6,14 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"text/template"
+
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/go-go-golems/glazed/pkg/cmds"
 	"github.com/go-go-golems/glazed/pkg/cmds/alias"
@@ -16,20 +24,13 @@ import (
 	"github.com/go-go-golems/glazed/pkg/helpers/compare"
 	"github.com/go-go-golems/glazed/pkg/helpers/templating"
 	"github.com/go-go-golems/oak/pkg"
-	"github.com/go-go-golems/oak/pkg/tree-sitter"
+	tree_sitter "github.com/go-go-golems/oak/pkg/tree-sitter"
 	"github.com/pkg/errors"
 	sitter "github.com/smacker/go-tree-sitter"
 	"gopkg.in/yaml.v3"
-	"io"
-	"io/fs"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strings"
-	"text/template"
 )
 
-//go:embed "../layers/oak.yaml"
+//go:embed "layers/oak.yaml"
 var oakLayerYaml string
 
 type OakParameterLayer struct {
@@ -417,4 +418,40 @@ func (oc *OakCommand) PrintQueries(w io.Writer) error {
 	}
 
 	return nil
+}
+
+// GetResultsByFile is a helper function that parses the given fileNames and
+// returns a map of results by fileName.
+func (oc *OakCommand) GetResultsByFile(
+	ctx context.Context,
+	fileNames []string,
+) (
+	map[string]tree_sitter.QueryResults, error) {
+	resultsByFile := map[string]tree_sitter.QueryResults{}
+
+	lang, err := oc.GetLanguage()
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not get language for oak command")
+	}
+
+	for _, fileName := range fileNames {
+		source, err := os.ReadFile(fileName)
+		if err != nil {
+			return nil, errors.Wrapf(err, "could not read file %s", fileName)
+		}
+
+		tree, err := oc.Parse(ctx, nil, []byte(source))
+		if err != nil {
+			return nil, errors.Wrapf(err, "could not parse file %s", fileName)
+		}
+
+		results, err := tree_sitter.ExecuteQueries(lang, tree.RootNode(), oc.Queries, source)
+		if err != nil {
+			return nil, errors.Wrapf(err, "could not execute queries for file %s", fileName)
+		}
+
+		resultsByFile[fileName] = results
+	}
+
+	return resultsByFile, nil
 }

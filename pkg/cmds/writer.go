@@ -8,7 +8,7 @@ import (
 	"github.com/go-go-golems/glazed/pkg/cmds/layers"
 	"github.com/go-go-golems/glazed/pkg/helpers/templating"
 	"github.com/go-go-golems/oak/pkg"
-	"github.com/go-go-golems/oak/pkg/tree-sitter"
+	tree_sitter "github.com/go-go-golems/oak/pkg/tree-sitter"
 	"io"
 	"strings"
 )
@@ -76,7 +76,7 @@ func (oc *OakWriterCommand) RunIntoWriter(
 		return err
 	}
 
-	resultsByFile, err := tree_sitter.GetResultsByFile(ctx, sources_, oc.OakCommand)
+	resultsByFile, err := oc.GetResultsByFile(ctx, sources_)
 	if err != nil {
 		return err
 	}

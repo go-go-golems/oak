@@ -2,15 +2,22 @@ package cmds
 
 import (
 	"context"
-	"github.com/go-go-golems/oak/pkg"
 	"io"
 	"io/fs"
 	"strings"
 
+	"github.com/go-go-golems/oak/pkg"
+	"gopkg.in/yaml.v3"
+
 	"github.com/go-go-golems/glazed/pkg/cmds"
 	"github.com/go-go-golems/glazed/pkg/cmds/alias"
 	"github.com/go-go-golems/glazed/pkg/cmds/layers"
+	"github.com/go-go-golems/glazed/pkg/cmds/layout"
 	"github.com/go-go-golems/glazed/pkg/cmds/loaders"
+	"github.com/go-go-golems/glazed/pkg/cmds/parameters"
+	"github.com/go-go-golems/glazed/pkg/middlewares"
+	"github.com/go-go-golems/glazed/pkg/settings"
+	"github.com/go-go-golems/glazed/pkg/types"
 )
 
 type OakGlazeCommand struct {
@@ -72,7 +79,7 @@ func (oc *OakGlazeCommand) RunIntoGlazeProcessor(
 		return err
 	}
 
-	resultsByFile, err := pkg.getResultsByFile(ctx, sources_, oc.OakCommand)
+	resultsByFile, err := oc.GetResultsByFile(ctx, sources_)
 	if err != nil {
 		return err
 	}

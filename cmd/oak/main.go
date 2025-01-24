@@ -4,12 +4,15 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+
 	clay "github.com/go-go-golems/clay/pkg"
+	edit_command "github.com/go-go-golems/clay/pkg/cmds/edit-command"
 	ls_commands "github.com/go-go-golems/clay/pkg/cmds/ls-commands"
 	"github.com/go-go-golems/clay/pkg/repositories"
-	"github.com/go-go-golems/clay/pkg/sql"
 	"github.com/go-go-golems/glazed/pkg/cli"
-	"github.com/go-go-golems/glazed/pkg/cmds"
 	glazed_cmds "github.com/go-go-golems/glazed/pkg/cmds"
 	"github.com/go-go-golems/glazed/pkg/cmds/alias"
 	"github.com/go-go-golems/glazed/pkg/cmds/layers"
@@ -18,15 +21,12 @@ import (
 	"github.com/go-go-golems/glazed/pkg/types"
 	"github.com/go-go-golems/oak/pkg"
 	cmds2 "github.com/go-go-golems/oak/pkg/cmds"
-	"github.com/go-go-golems/oak/pkg/tree-sitter"
+	tree_sitter "github.com/go-go-golems/oak/pkg/tree-sitter"
 	"github.com/pkg/errors"
 	sitter "github.com/smacker/go-tree-sitter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
-	"io"
-	"os"
-	"path/filepath"
 )
 
 var rootCmd = &cobra.Command{
@@ -138,7 +138,7 @@ var runCommandCmd = &cobra.Command{
 			lang, err := oak.GetLanguage()
 			cobra.CheckErr(err)
 
-			results, err := pkg.ExecuteQueries(lang, tree.RootNode(), oak.Queries, sourceCode)
+			results, err := tree_sitter.ExecuteQueries(lang, tree.RootNode(), oak.Queries, sourceCode)
 			cobra.CheckErr(err)
 
 			s, err := oak.Render(results)
@@ -217,11 +217,21 @@ func initAllCommands(helpSystem *help.HelpSystem) error {
 	if err != nil {
 		return err
 	}
-	cobraQueriesCommand, err := sql.BuildCobraCommandWithSqletonMiddlewares(lsCommandsCommand)
+	cobraQueriesCommand, err := cli.BuildCobraCommandFromGlazeCommand(lsCommandsCommand)
 	if err != nil {
 		return err
 	}
 	rootCmd.AddCommand(cobraQueriesCommand)
+
+	editCommandCommand, err := edit_command.NewEditCommand(allCommands)
+	if err != nil {
+		return err
+	}
+	cobraEditCommandCommand, err := cli.BuildCobraCommandFromCommand(editCommandCommand)
+	if err != nil {
+		return err
+	}
+	rootCmd.AddCommand(cobraEditCommandCommand)
 
 	glazeCmd := &cobra.Command{
 		Use:   "glaze",
@@ -310,7 +320,7 @@ func registerLegacyCommands() {
 					queryName = "main"
 				}
 
-				description := cmds.NewCommandDescription("query")
+				description := glazed_cmds.NewCommandDescription("query")
 
 				oak := cmds2.NewOakWriterCommand(description,
 					cmds2.WithQueries(tree_sitter.SitterQuery{
@@ -332,7 +342,7 @@ func registerLegacyCommands() {
 					cobra.CheckErr(err)
 				}
 
-				results, err := pkg.ExecuteQueries(lang, tree.RootNode(), oak.Queries, sourceCode)
+				results, err := tree_sitter.ExecuteQueries(lang, tree.RootNode(), oak.Queries, sourceCode)
 				cobra.CheckErr(err)
 
 				// render template if provided
@@ -385,7 +395,7 @@ func registerLegacyCommands() {
 					cobra.CheckErr(err)
 				}
 
-				description := cmds.NewCommandDescription("parse")
+				description := glazed_cmds.NewCommandDescription("parse")
 
 				oak := cmds2.NewOakWriterCommand(
 					description,

@@ -1,11 +1,8 @@
 package tree_sitter
 
 import (
-	"context"
-	"github.com/go-go-golems/oak/pkg/cmds"
 	"github.com/pkg/errors"
-	"github.com/smacker/go-tree-sitter"
-	"os"
+	sitter "github.com/smacker/go-tree-sitter"
 )
 
 type Capture struct {
@@ -53,43 +50,6 @@ type SitterQuery struct {
 }
 
 type QueryResults map[string]*Result
-
-// GetResultsByFile is a helper function that parses the given fileNames and
-// returns a map of results by fileName.
-func GetResultsByFile(
-	ctx context.Context,
-	fileNames []string,
-	oc *cmds.OakCommand,
-) (
-	map[string]QueryResults, error) {
-	resultsByFile := map[string]QueryResults{}
-
-	lang, err := oc.GetLanguage()
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not get language for oak command")
-	}
-
-	for _, fileName := range fileNames {
-		source, err := os.ReadFile(fileName)
-		if err != nil {
-			return nil, errors.Wrapf(err, "could not read file %s", fileName)
-		}
-
-		tree, err := oc.Parse(ctx, nil, []byte(source))
-		if err != nil {
-			return nil, errors.Wrapf(err, "could not parse file %s", fileName)
-		}
-
-		results, err := ExecuteQueries(lang, tree.RootNode(), oc.Queries, source)
-		if err != nil {
-			return nil, errors.Wrapf(err, "could not execute queries for file %s", fileName)
-		}
-
-		resultsByFile[fileName] = results
-	}
-
-	return resultsByFile, nil
-}
 
 // ExecuteQueries runs the given queries on the given tree and returns the
 // results. Individual names are resolved using the sourceCode string, so as
