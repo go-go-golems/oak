@@ -32,12 +32,6 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "oak",
 	Short: "oak runs tree-sitter queries against your source code",
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		// reinitialize the logger because we can now parse --log-level and co
-		// from the command line flag
-		err := clay.InitLogger()
-		cobra.CheckErr(err)
-	},
 }
 
 func main() {
@@ -163,8 +157,6 @@ func initRootCmd() (*help.HelpSystem, error) {
 	helpSystem.SetupCobraRootCommand(rootCmd)
 
 	err = clay.InitViper("oak", rootCmd)
-	cobra.CheckErr(err)
-	err = clay.InitLogger()
 	cobra.CheckErr(err)
 
 	rootCmd.AddCommand(runCommandCmd)
