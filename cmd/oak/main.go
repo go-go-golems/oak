@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 
 	clay "github.com/go-go-golems/clay/pkg"
-	edit_command "github.com/go-go-golems/clay/pkg/cmds/edit-command"
-	ls_commands "github.com/go-go-golems/clay/pkg/cmds/ls-commands"
+	clay_commandmeta "github.com/go-go-golems/clay/pkg/cmds/commandmeta"
+	clay_repositories "github.com/go-go-golems/clay/pkg/cmds/repositories"
 	"github.com/go-go-golems/clay/pkg/repositories"
 	"github.com/go-go-golems/glazed/pkg/cli"
 	glazed_cmds "github.com/go-go-golems/glazed/pkg/cmds"
@@ -154,7 +154,6 @@ func initRootCmd() (*help.HelpSystem, error) {
 	err := helpSystem.LoadSectionsFromFS(docFS, ".")
 	cobra.CheckErr(err)
 
-
 	helpSystem.SetupCobraRootCommand(rootCmd)
 
 	err = clay.InitViper("oak", rootCmd)
@@ -186,46 +185,6 @@ func initAllCommands(helpSystem *help.HelpSystem) error {
 		return err
 	}
 
-	lsCommandsCommand, err := ls_commands.NewListCommandsCommand(allCommands,
-		ls_commands.WithCommandDescriptionOptions(
-			glazed_cmds.WithShort("Commands related to sqleton queries"),
-		),
-		ls_commands.WithAddCommandToRowFunc(func(
-			command glazed_cmds.Command,
-			row types.Row,
-			parsedLayers *layers.ParsedLayers,
-		) ([]types.Row, error) {
-			ret := []types.Row{row}
-			switch c := command.(type) {
-			case *cmds2.OakCommand:
-				row.Set("language", c.Language)
-				row.Set("queries", c.Queries)
-				row.Set("type", "oak")
-			default:
-			}
-
-			return ret, nil
-		}),
-	)
-	if err != nil {
-		return err
-	}
-	cobraQueriesCommand, err := cli.BuildCobraCommandFromGlazeCommand(lsCommandsCommand)
-	if err != nil {
-		return err
-	}
-	rootCmd.AddCommand(cobraQueriesCommand)
-
-	editCommandCommand, err := edit_command.NewEditCommand(allCommands)
-	if err != nil {
-		return err
-	}
-	cobraEditCommandCommand, err := cli.BuildCobraCommandFromCommand(editCommandCommand)
-	if err != nil {
-		return err
-	}
-	rootCmd.AddCommand(cobraEditCommandCommand)
-
 	glazeCmd := &cobra.Command{
 		Use:   "glaze",
 		Short: "Run commands and output results as structured data",
@@ -244,6 +203,46 @@ func initAllCommands(helpSystem *help.HelpSystem) error {
 	if err != nil {
 		return err
 	}
+
+	// Create and add the unified command management group
+	commandManagementCmd, err := clay_commandmeta.NewCommandManagementCommandGroup(
+		allCommands,
+		clay_commandmeta.WithListAddCommandToRowFunc(func(
+			command glazed_cmds.Command,
+			row types.Row,
+			parsedLayers *layers.ParsedLayers,
+		) ([]types.Row, error) {
+			ret := []types.Row{row}
+			switch c := command.(type) {
+			case *cmds2.OakCommand:
+				row.Set("language", c.Language)
+				row.Set("queries", c.Queries)
+				row.Set("type", "oak")
+			case *cmds2.OakWriterCommand:
+				row.Set("language", c.Language)
+				// TODO(manuel, 2024-07-30) Queries might need a proper representation
+				// row.Set("queries", c.Queries)
+				row.Set("type", "oak-writer")
+
+			case *alias.CommandAlias: // Handle aliases if needed
+				row.Set("type", "alias")
+				row.Set("aliasFor", c.AliasFor)
+			default:
+				if _, ok := row.Get("type"); !ok {
+					row.Set("type", "unknown")
+				}
+			}
+			return ret, nil
+		}),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize command management commands: %w", err)
+	}
+	rootCmd.AddCommand(commandManagementCmd)
+
+	// Create and add the repositories command group
+	rootCmd.AddCommand(clay_repositories.NewRepositoriesGroupCommand())
+
 	return nil
 }
 

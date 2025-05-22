@@ -1,4 +1,4 @@
-package example
+package main
 
 // Simple is an exported function
 func Simple(a int, b string) string {

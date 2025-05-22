@@ -205,9 +205,10 @@ func main() {
 	childrenCount := 0
 
 	for _, comp := range components {
-		if comp.Type == "function" {
+		switch comp.Type {
+		case "function":
 			funcCount++
-		} else if comp.Type == "arrow" {
+		case "arrow":
 			arrowCount++
 		}
 
