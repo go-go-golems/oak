@@ -154,6 +154,7 @@ func initRootCmd() (*help.HelpSystem, error) {
 	err := helpSystem.LoadSectionsFromFS(docFS, ".")
 	cobra.CheckErr(err)
 
+
 	helpSystem.SetupCobraRootCommand(rootCmd)
 
 	err = clay.InitViper("oak", rootCmd)
