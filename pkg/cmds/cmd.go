@@ -268,10 +268,9 @@ func (oc *OakCommand) Parse(ctx context.Context, oldTree *sitter.Tree, code []by
 	return tree, nil
 }
 
-// DumpTree prints the tree out to the console. This is lifted straight from example_test
-// in the smacker/sitter repo.
+// DumpTree prints the tree out to the console.
 //
-// The output format is:
+// By default, it uses the legacy text format:
 //
 // source_file [0-29]
 //
@@ -288,8 +287,10 @@ func (oc *OakCommand) Parse(ctx context.Context, oldTree *sitter.Tree, code []by
 //	            name: identifier [13-14]
 //	            type: type_identifier [15-18]
 //
-// The recursive cursor walker from the documentation didn't seem to work, at least on the hcl file.
+// But it can also output in several other formats (text, xml, json, yaml)
+// when using DumpTreeToWriter with a specific format.
 func (oc *OakCommand) DumpTree(tree *sitter.Tree) {
+	// For backward compatibility, use the original implementation
 	var visit2 func(n *sitter.Node, name string, depth int)
 	visit2 = func(n *sitter.Node, name string, depth int) {
 		printNode(n, depth, name)
@@ -299,6 +300,12 @@ func (oc *OakCommand) DumpTree(tree *sitter.Tree) {
 
 	}
 	visit2(tree.RootNode(), "root", 0)
+}
+
+// DumpTreeToWriter outputs the tree to the provided writer using the specified format.
+func (oc *OakCommand) DumpTreeToWriter(tree *sitter.Tree, source []byte, w io.Writer, format tree_sitter.DumpFormat, options tree_sitter.DumpOptions) error {
+	dumper := tree_sitter.NewDumper(format)
+	return dumper.Dump(tree, source, w, options)
 }
 
 func printNode(n *sitter.Node, depth int, name string) {

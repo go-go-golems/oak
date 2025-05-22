@@ -1,26 +1,34 @@
+version: "2"
+
 linters:
-  disable-all: false
+  default: none
   enable:
     # defaults
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
-    - typecheck
     - unused
     # stuff I'm adding
     - exhaustive
     #    - gochecknoglobals
     #    - gochecknoinits
-    - gofmt
     - nonamedreturns
     - predeclared
-  fast: false
-run:
-  skip-dirs:
-    - test-inputs
-    - contexts
-issues:
-  exclude:
-    - 'SA1019: cli.CreateProcessorLegacy'
+  exclusions:
+    paths:
+      - test-inputs/
+      - contexts/
+    rules:
+      - linters:
+          - staticcheck
+        text: 'SA1019: cli.CreateProcessorLegacy'
+  settings:
+    errcheck:
+      exclude-functions:
+        - (io.Closer).Close
+        - fmt.Fprintf
+        - fmt.Fprintln
+formatters:
+  enable:
+    - gofmt
