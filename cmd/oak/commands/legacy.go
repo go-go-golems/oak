@@ -109,6 +109,18 @@ func RegisterLegacyCommands(rootCmd *cobra.Command) {
 			language, err := cmd.Flags().GetString("language")
 			cobra.CheckErr(err)
 
+			// Get dump format options
+			dumpFormat, err := cmd.Flags().GetString("dump-format")
+			cobra.CheckErr(err)
+			showBytes, err := cmd.Flags().GetBool("show-bytes")
+			cobra.CheckErr(err)
+			showContent, err := cmd.Flags().GetBool("show-content")
+			cobra.CheckErr(err)
+			showAttributes, err := cmd.Flags().GetBool("show-attributes")
+			cobra.CheckErr(err)
+			skipWhitespace, err := cmd.Flags().GetBool("skip-whitespace")
+			cobra.CheckErr(err)
+
 			for _, inputFile := range args {
 				var lang *sitter.Language
 				if language != "" {
@@ -133,12 +145,46 @@ func RegisterLegacyCommands(rootCmd *cobra.Command) {
 				tree, err := oak.Parse(ctx, nil, sourceCode)
 				cobra.CheckErr(err)
 
-				oak.DumpTree(tree)
+				// Use the enhanced dumping with custom format if specified
+				if dumpFormat != "" {
+					var format tree_sitter.DumpFormat
+					switch dumpFormat {
+					case "text":
+						format = tree_sitter.FormatText
+					case "xml":
+						format = tree_sitter.FormatXML
+					case "json":
+						format = tree_sitter.FormatJSON
+					case "yaml":
+						format = tree_sitter.FormatYAML
+					default:
+						format = tree_sitter.FormatText
+					}
+
+					options := tree_sitter.DumpOptions{
+						ShowBytes:      showBytes,
+						ShowContent:    showContent,
+						ShowAttributes: showAttributes,
+						SkipWhitespace: skipWhitespace,
+					}
+
+					err = oak.DumpTreeToWriter(tree, sourceCode, os.Stdout, format, options)
+					cobra.CheckErr(err)
+				} else {
+					// Use the original DumpTree for backward compatibility
+					oak.DumpTree(tree)
+				}
 			}
 		},
 	}
 
 	parseCmd.Flags().String("language", "", "Language name")
+	// Add dump format flags
+	parseCmd.Flags().String("dump-format", "", "Output format for the tree dump (text, xml, json, yaml)")
+	parseCmd.Flags().Bool("show-bytes", false, "Show byte offsets in the tree dump")
+	parseCmd.Flags().Bool("show-content", true, "Show node content in the tree dump")
+	parseCmd.Flags().Bool("show-attributes", true, "Show node attributes in the tree dump")
+	parseCmd.Flags().Bool("skip-whitespace", true, "Skip whitespace-only nodes in the tree dump")
 
 	rootCmd.AddCommand(parseCmd)
 	rootCmd.AddCommand(queryCmd)
