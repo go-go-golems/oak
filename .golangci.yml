@@ -29,7 +29,6 @@ linters:
         - (io.Closer).Close
         - fmt.Fprintf
         - fmt.Fprintln
-        - 
 formatters:
   enable:
     - gofmt
