@@ -11,6 +11,7 @@ import (
 	"github.com/go-go-golems/glazed/pkg/cmds/alias"
 	"github.com/go-go-golems/glazed/pkg/cmds/loaders"
 	cmds2 "github.com/go-go-golems/oak/pkg/cmds"
+	"github.com/go-go-golems/oak/pkg/tree-sitter/dump"
 	tree_sitter "github.com/go-go-golems/oak/pkg/tree-sitter"
 	"github.com/spf13/cobra"
 )
@@ -20,6 +21,7 @@ var RunCommandCmd = &cobra.Command{
 	Short: "Run a command from a file",
 	Args:  cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
+		verboseAST, _ := cmd.Flags().GetBool("verbose-ast")
 		queryFile, err := filepath.Abs(args[0])
 		if err != nil {
 			cobra.CheckErr(err)
@@ -51,6 +53,16 @@ var RunCommandCmd = &cobra.Command{
 			lang, err := oak.GetLanguage()
 			cobra.CheckErr(err)
 
+			if verboseAST {
+				// Print verbose AST to stdout before executing queries
+				_ = (&dump.TextDumper{}).Dump(tree, sourceCode, os.Stdout, dump.Options{
+					ShowBytes:      true,
+					ShowContent:    false,
+					ShowAttributes: true,
+					SkipWhitespace: false,
+				})
+			}
+
 			results, err := tree_sitter.ExecuteQueries(lang, tree.RootNode(), oak.Queries, sourceCode)
 			cobra.CheckErr(err)
 
@@ -68,4 +80,8 @@ func readFileOrStdin(filename string) ([]byte, error) {
 	}
 	b, err := os.ReadFile(filename)
 	return b, err
+}
+
+func init() {
+	RunCommandCmd.Flags().Bool("verbose-ast", false, "Print verbose AST before running queries")
 }
