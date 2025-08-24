@@ -24,6 +24,15 @@ func NodeToLispExpression(node *sitter.Node, content []byte, includeAnonymous bo
     elements := []pm.Expression{pm.Symbol{Name: node.Type()}}
 
     childCount := int(node.ChildCount())
+    if childCount == 0 {
+        // Include leaf content as Atom for matching text
+        if content != nil {
+            text := node.Content(content)
+            if text != "" {
+                elements = append(elements, pm.Atom{Value: text})
+            }
+        }
+    }
     for i := 0; i < childCount; i++ {
         child := node.Child(i)
         if child == nil || child.IsNull() {
