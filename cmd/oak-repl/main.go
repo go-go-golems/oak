@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-go-golems/bobatea/pkg/repl"
@@ -23,58 +24,7 @@ func (e *PatternEvaluator) Evaluate(ctx context.Context, code string) (string, e
 	if len(code) == 0 {
 		return "", nil
 	}
-	if code[0] == '/' {
-		var cmd, arg string
-		for i := 1; i < len(code); i++ {
-			if code[i] == ' ' {
-				cmd = code[1:i]
-				arg = code[i+1:]
-				break
-			}
-		}
-		if cmd == "" {
-			cmd = code[1:]
-		}
-		switch cmd {
-		case "load":
-			b, err := os.ReadFile(arg)
-			if err != nil {
-				return "", err
-			}
-			e.content = b
-			e.currentFile = arg
-			return fmt.Sprintf("loaded %s (%d bytes)", arg, len(b)), nil
-		case "lang":
-			e.currentLanguage = arg
-			return "language set", nil
-		case "ast":
-			if e.currentLanguage == "" || e.currentFile == "" {
-				return "usage: /lang <lang> then /load <file>", nil
-			}
-			qb := api.NewQueryBuilder(api.WithLanguage(e.currentLanguage))
-			expr, err := qb.ToLispExpression(ctx, e.currentFile, false)
-			if err != nil {
-				return "", err
-			}
-			e.lispAST = expr
-			return expr.String(), nil
-		case "pattern":
-			if e.lispAST == nil {
-				return "no AST; run /ast first", nil
-			}
-			pat, err := pm.Parse(arg)
-			if err != nil {
-				return "", err
-			}
-			b := pm.PatMatch(pat, e.lispAST, pm.NoBindings)
-			if pm.IsFail(b) {
-				return "NO MATCH", nil
-			}
-			return fmt.Sprintf("MATCH %s", b.String()), nil
-		default:
-			return "unknown command", nil
-		}
-	}
+	// Regular input (non-slash) not used for now
 	return "", nil
 }
 
@@ -91,6 +41,68 @@ func main() {
 
 	model := repl.NewModel(evaluator, config)
 	model.SetTheme(repl.BuiltinThemes["dark"])
+
+	// /lang <language>
+	model.AddCustomCommand("lang", func(args []string) tea.Cmd {
+		return func() tea.Msg {
+			if len(args) != 1 {
+				return repl.EvaluationCompleteMsg{Input: "/lang", Output: "usage: /lang <language>", Error: fmt.Errorf("invalid usage")}
+			}
+			evaluator.currentLanguage = args[0]
+			return repl.EvaluationCompleteMsg{Input: "/lang " + args[0], Output: "language set", Error: nil}
+		}
+	})
+
+	// /load <file>
+	model.AddCustomCommand("load", func(args []string) tea.Cmd {
+		return func() tea.Msg {
+			if len(args) != 1 {
+				return repl.EvaluationCompleteMsg{Input: "/load", Output: "usage: /load <file>", Error: fmt.Errorf("invalid usage")}
+			}
+			b, err := os.ReadFile(args[0])
+			if err != nil {
+				return repl.EvaluationCompleteMsg{Input: "/load " + args[0], Output: err.Error(), Error: err}
+			}
+			evaluator.currentFile = args[0]
+			evaluator.content = b
+			return repl.EvaluationCompleteMsg{Input: "/load " + args[0], Output: fmt.Sprintf("loaded %s (%d bytes)", args[0], len(b)), Error: nil}
+		}
+	})
+
+	// /ast
+	model.AddCustomCommand("ast", func(args []string) tea.Cmd {
+		return func() tea.Msg {
+			if evaluator.currentLanguage == "" || evaluator.currentFile == "" {
+				return repl.EvaluationCompleteMsg{Input: "/ast", Output: "usage: /lang <lang> then /load <file>", Error: fmt.Errorf("missing context")}
+			}
+			qb := api.NewQueryBuilder(api.WithLanguage(evaluator.currentLanguage))
+			expr, err := qb.ToLispExpression(context.Background(), evaluator.currentFile, false)
+			if err != nil {
+				return repl.EvaluationCompleteMsg{Input: "/ast", Output: err.Error(), Error: err}
+			}
+			evaluator.lispAST = expr
+			return repl.EvaluationCompleteMsg{Input: "/ast", Output: expr.String(), Error: nil}
+		}
+	})
+
+	// /pattern <pattern>
+	model.AddCustomCommand("pattern", func(args []string) tea.Cmd {
+		return func() tea.Msg {
+			if evaluator.lispAST == nil {
+				return repl.EvaluationCompleteMsg{Input: "/pattern", Output: "no AST; run /ast first", Error: fmt.Errorf("no ast")}
+			}
+			patternStr := strings.Join(args, " ")
+			pat, err := pm.Parse(patternStr)
+			if err != nil {
+				return repl.EvaluationCompleteMsg{Input: "/pattern", Output: err.Error(), Error: err}
+			}
+			b := pm.PatMatch(pat, evaluator.lispAST, pm.NoBindings)
+			if pm.IsFail(b) {
+				return repl.EvaluationCompleteMsg{Input: "/pattern", Output: "NO MATCH", Error: nil}
+			}
+			return repl.EvaluationCompleteMsg{Input: "/pattern", Output: "MATCH " + b.String(), Error: nil}
+		}
+	})
 
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
