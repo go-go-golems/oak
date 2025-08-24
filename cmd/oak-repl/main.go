@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-go-golems/bobatea/pkg/repl"
@@ -86,12 +85,12 @@ func main() {
 	})
 
 	// /pattern <pattern>
-	model.AddCustomCommand("pattern", func(args []string) tea.Cmd {
+	model.AddCustomCommandRaw("pattern", func(raw string, args []string) tea.Cmd {
 		return func() tea.Msg {
 			if evaluator.lispAST == nil {
 				return repl.EvaluationCompleteMsg{Input: "/pattern", Output: "no AST; run /ast first", Error: fmt.Errorf("no ast")}
 			}
-			patternStr := strings.Join(args, " ")
+			patternStr := raw
 			pat, err := pm.Parse(patternStr)
 			if err != nil {
 				return repl.EvaluationCompleteMsg{Input: "/pattern", Output: err.Error(), Error: err}
