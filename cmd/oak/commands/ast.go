@@ -9,6 +9,7 @@ import (
     "github.com/go-go-golems/oak/pkg/api"
     "github.com/go-go-golems/oak/pkg"
     tsdump "github.com/go-go-golems/oak/pkg/tree-sitter/dump"
+    pm "github.com/go-go-golems/oak/pkg/patternmatcher"
     sitter "github.com/smacker/go-tree-sitter"
     "github.com/spf13/cobra"
 )
@@ -56,7 +57,11 @@ var ASTCmd = &cobra.Command{
             case "lisp":
                 expr, err := qb.ToLispExpression(ctx, filePath, includeAnonymous)
                 cobra.CheckErr(err)
-                fmt.Println(expr.String())
+                // Pretty print by default
+                _ = tsdump.DumpLispExpression(expr, os.Stdout, tsdump.LispOptions{Indent: "  ", Compact: false})
+                if _, ok := expr.(pm.Cons); ok {
+                    fmt.Println()
+                }
             case "verbose":
                 parser := sitter.NewParser()
                 parser.SetLanguage(lang)
