@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-go-golems/oak/pkg"
 	"github.com/go-go-golems/oak/pkg/tree-sitter"
+	pm "github.com/go-go-golems/oak/pkg/patternmatcher"
 	"github.com/pkg/errors"
 	sitter "github.com/smacker/go-tree-sitter"
 	"gopkg.in/yaml.v3"
@@ -247,6 +248,39 @@ func (qb *QueryBuilder) Run(
 
 	wg.Wait()
 	return results, nil
+}
+
+// ToLispExpression parses the provided file and returns the root node as a
+// patternmatcher Expression S-expression. It skips anonymous nodes by default
+// for readability unless includeAnonymous is true.
+func (qb *QueryBuilder) ToLispExpression(
+	ctx context.Context,
+	filePath string,
+	includeAnonymous bool,
+) (pm.Expression, error) {
+	if qb.language == "" {
+		return nil, errors.New("language is required")
+	}
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read file")
+	}
+
+	lang, err := qb.getLanguage()
+	if err != nil {
+		return nil, err
+	}
+
+	parser := sitter.NewParser()
+	parser.SetLanguage(lang)
+	tree, err := parser.ParseCtx(ctx, nil, content)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse file")
+	}
+	defer tree.Close()
+
+	return tree_sitter.NodeToLispExpression(tree.RootNode(), content, includeAnonymous), nil
 }
 
 // getLanguage gets the tree-sitter language for the given language name
