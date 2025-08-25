@@ -95,11 +95,18 @@ func main() {
 			if err != nil {
 				return repl.EvaluationCompleteMsg{Input: "/pattern", Output: err.Error(), Error: err}
 			}
-			b := pm.PatMatch(pat, evaluator.lispAST, pm.NoBindings)
-			if pm.IsFail(b) {
+			matches := collectMatches(pat, evaluator.lispAST)
+			if len(matches) == 0 {
 				return repl.EvaluationCompleteMsg{Input: "/pattern", Output: "NO MATCH", Error: nil}
 			}
-			return repl.EvaluationCompleteMsg{Input: "/pattern", Output: "MATCH " + b.String(), Error: nil}
+			out := fmt.Sprintf("matches: %d\n", len(matches))
+			for i, b := range matches {
+				if pm.IsFail(b) {
+					continue
+				}
+				out += fmt.Sprintf("%d) %s\n", i+1, b.String())
+			}
+			return repl.EvaluationCompleteMsg{Input: "/pattern", Output: out, Error: nil}
 		}
 	})
 
@@ -107,6 +114,31 @@ func main() {
 	if _, err := p.Run(); err != nil {
 		log.Println(err)
 		os.Exit(1)
+	}
+}
+
+
+// collectMatches traverses the expression tree and returns all bindings for matches
+func collectMatches(pattern pm.Expression, expr pm.Expression) []pm.Binding {
+	var out []pm.Binding
+	walkExpressions(expr, func(e pm.Expression) {
+		b := pm.PatMatch(pattern, e, pm.NoBindings)
+		if !pm.IsFail(b) {
+			out = append(out, b)
+		}
+	})
+	return out
+}
+
+// walkExpressions calls fn for the expression and all its sub-expressions
+func walkExpressions(expr pm.Expression, fn func(pm.Expression)) {
+	if expr == nil {
+		return
+	}
+	fn(expr)
+	if cons, ok := expr.(pm.Cons); ok {
+		walkExpressions(cons.Car, fn)
+		walkExpressions(cons.Cdr, fn)
 	}
 }
 
