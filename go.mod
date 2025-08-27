@@ -5,9 +5,9 @@ go 1.24.3
 require (
 	github.com/bmatcuk/doublestar/v4 v4.9.0
 	github.com/charmbracelet/bubbletea v1.3.6
-	github.com/go-go-golems/bobatea v0.0.26
+	github.com/go-go-golems/bobatea v0.0.28
 	github.com/go-go-golems/clay v0.1.47
-	github.com/go-go-golems/glazed v0.6.11
+	github.com/go-go-golems/glazed v0.6.12
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.34.0
 	github.com/smacker/go-tree-sitter v0.0.0-20231219031718-233c2f923ac7

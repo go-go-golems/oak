@@ -9,27 +9,27 @@ func PatMatch(pattern Expression, input Expression, bindings Binding) Binding {
 	if IsFail(bindings) {
 		return Fail
 	}
-	
+
 	// Variable pattern
 	if IsVariable(pattern) {
 		return MatchVariable(pattern, input, bindings)
 	}
-	
+
 	// Exact match
 	if pattern.Equal(input) {
 		return bindings
 	}
-	
+
 	// Segment pattern
 	if IsSegmentPattern(pattern) {
 		return SegmentMatcher(pattern, input, bindings)
 	}
-	
+
 	// Single pattern
 	if IsSinglePattern(pattern) {
 		return SingleMatcher(pattern, input, bindings)
 	}
-	
+
 	// Compound pattern (both are lists)
 	if patternCons, ok := pattern.(Cons); ok {
 		if inputCons, ok := input.(Cons); ok {
@@ -38,7 +38,7 @@ func PatMatch(pattern Expression, input Expression, bindings Binding) Binding {
 			if IsFail(firstMatch) {
 				return Fail
 			}
-			
+
 			// Handle nil Cdr properly
 			if patternCons.Cdr == nil && inputCons.Cdr == nil {
 				return firstMatch
@@ -49,7 +49,7 @@ func PatMatch(pattern Expression, input Expression, bindings Binding) Binding {
 			}
 		}
 	}
-	
+
 	return Fail
 }
 
@@ -59,18 +59,18 @@ func SegmentMatcher(pattern Expression, input Expression, bindings Binding) Bind
 	if !ok {
 		return Fail
 	}
-	
+
 	segmentVar, ok := patternCons.Car.(Symbol)
 	if !ok {
 		return Fail
 	}
-	
+
 	// Get the segment match function based on the pattern type
 	matchFunc := GetSegmentMatchFunc(segmentVar.Name)
 	if matchFunc == nil {
 		return Fail
 	}
-	
+
 	return matchFunc(pattern, input, bindings)
 }
 
@@ -80,18 +80,18 @@ func SingleMatcher(pattern Expression, input Expression, bindings Binding) Bindi
 	if !ok {
 		return Fail
 	}
-	
+
 	operator, ok := patternCons.Car.(Symbol)
 	if !ok {
 		return Fail
 	}
-	
+
 	// Get the single match function based on the pattern type
 	matchFunc := GetSingleMatchFunc(operator.Name)
 	if matchFunc == nil {
 		return Fail
 	}
-	
+
 	return matchFunc(pattern, input, bindings)
 }
 
@@ -151,7 +151,7 @@ func SegmentMatch(pattern Expression, input Expression, bindings Binding, minLen
 	if !ok {
 		return Fail
 	}
-	
+
 	// Extract variable from (?* var) or (?+ var)
 	var variable string
 	if varCons, ok := patternCons.Cdr.(Cons); ok {
@@ -163,22 +163,22 @@ func SegmentMatch(pattern Expression, input Expression, bindings Binding, minLen
 	} else {
 		return Fail
 	}
-	
+
 	// Convert input to slice for easier manipulation
 	inputList := ConsToSlice(input)
-	
+
 	// Try different segment lengths
 	for segmentLen := minLength; segmentLen <= len(inputList); segmentLen++ {
 		// Create segment
 		segment := SliceToCons(inputList[:segmentLen])
-		
+
 		// Try to match variable with this segment
 		newBindings := ExtendBindings(variable, segment, bindings)
 		if !IsFail(newBindings) {
 			return newBindings
 		}
 	}
-	
+
 	return Fail
 }
 
@@ -188,7 +188,7 @@ func SegmentMatchZeroOrOne(pattern Expression, input Expression, bindings Bindin
 	if !ok {
 		return Fail
 	}
-	
+
 	// Extract variable
 	var variable string
 	if varCons, ok := patternCons.Cdr.(Cons); ok {
@@ -200,13 +200,13 @@ func SegmentMatchZeroOrOne(pattern Expression, input Expression, bindings Bindin
 	} else {
 		return Fail
 	}
-	
+
 	// Try matching zero elements (empty)
 	emptyBindings := ExtendBindings(variable, nil, bindings)
 	if !IsFail(emptyBindings) {
 		return emptyBindings
 	}
-	
+
 	// Try matching one element
 	if inputCons, ok := input.(Cons); ok {
 		oneElementBindings := ExtendBindings(variable, inputCons.Car, bindings)
@@ -214,7 +214,7 @@ func SegmentMatchZeroOrOne(pattern Expression, input Expression, bindings Bindin
 			return oneElementBindings
 		}
 	}
-	
+
 	return Fail
 }
 
@@ -225,28 +225,28 @@ func MatchIs(pattern Expression, input Expression, bindings Binding) Binding {
 	if !ok {
 		return Fail
 	}
-	
+
 	// Extract variable and predicate
 	args := ConsToSlice(patternCons.Cdr)
 	if len(args) != 2 {
 		return Fail
 	}
-	
+
 	variable, ok := args[0].(Symbol)
 	if !ok {
 		return Fail
 	}
-	
+
 	predicate, ok := args[1].(Symbol)
 	if !ok {
 		return Fail
 	}
-	
+
 	// Test predicate
 	if TestPredicate(predicate.Name, input) {
 		return ExtendBindings(variable.Name, input, bindings)
 	}
-	
+
 	return Fail
 }
 
@@ -256,17 +256,17 @@ func MatchAnd(pattern Expression, input Expression, bindings Binding) Binding {
 	if !ok {
 		return Fail
 	}
-	
+
 	patterns := ConsToSlice(patternCons.Cdr)
 	currentBindings := bindings
-	
+
 	for _, pat := range patterns {
 		currentBindings = PatMatch(pat, input, currentBindings)
 		if IsFail(currentBindings) {
 			return Fail
 		}
 	}
-	
+
 	return currentBindings
 }
 
@@ -276,16 +276,16 @@ func MatchOr(pattern Expression, input Expression, bindings Binding) Binding {
 	if !ok {
 		return Fail
 	}
-	
+
 	patterns := ConsToSlice(patternCons.Cdr)
-	
+
 	for _, pat := range patterns {
 		result := PatMatch(pat, input, bindings)
 		if !IsFail(result) {
 			return result
 		}
 	}
-	
+
 	return Fail
 }
 
@@ -295,16 +295,16 @@ func MatchNot(pattern Expression, input Expression, bindings Binding) Binding {
 	if !ok {
 		return Fail
 	}
-	
+
 	patterns := ConsToSlice(patternCons.Cdr)
-	
+
 	for _, pat := range patterns {
 		result := PatMatch(pat, input, bindings)
 		if !IsFail(result) {
 			return Fail // Pattern matched, so ?not fails
 		}
 	}
-	
+
 	return bindings // No patterns matched, so ?not succeeds
 }
 
@@ -314,19 +314,19 @@ func MatchIf(pattern Expression, input Expression, bindings Binding) Binding {
 	if !ok {
 		return Fail
 	}
-	
+
 	args := ConsToSlice(patternCons.Cdr)
 	if len(args) != 1 {
 		return Fail
 	}
-	
+
 	condition := args[0]
-	
+
 	// Evaluate condition (simplified - just check if it's true)
 	if EvaluateCondition(condition, bindings) {
 		return bindings
 	}
-	
+
 	return Fail
 }
 
@@ -334,7 +334,7 @@ func MatchIf(pattern Expression, input Expression, bindings Binding) Binding {
 func ConsToSlice(expr Expression) []Expression {
 	var result []Expression
 	current := expr
-	
+
 	for current != nil {
 		if cons, ok := current.(Cons); ok {
 			result = append(result, cons.Car)
@@ -343,7 +343,7 @@ func ConsToSlice(expr Expression) []Expression {
 			break
 		}
 	}
-	
+
 	return result
 }
 
@@ -389,7 +389,7 @@ func EvaluateCondition(condition Expression, bindings Binding) bool {
 		operator := cons.Car
 		if opSym, ok := operator.(Symbol); ok {
 			args := ConsToSlice(cons.Cdr)
-			
+
 			switch opSym.Name {
 			case ">":
 				if len(args) == 2 {
@@ -413,15 +413,15 @@ func CompareNumbers(left, right Expression, bindings Binding, op string) bool {
 	// Resolve variables
 	leftVal := ResolveValue(left, bindings)
 	rightVal := ResolveValue(right, bindings)
-	
+
 	// Extract numeric values
 	leftNum, leftOk := GetNumber(leftVal)
 	rightNum, rightOk := GetNumber(rightVal)
-	
+
 	if !leftOk || !rightOk {
 		return false
 	}
-	
+
 	switch op {
 	case ">":
 		return leftNum > rightNum
@@ -460,4 +460,3 @@ func GetNumber(expr Expression) (float64, bool) {
 	}
 	return 0, false
 }
-

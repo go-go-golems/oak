@@ -15,12 +15,11 @@ import (
 	"github.com/go-go-golems/glazed/pkg/cmds/layers"
 	"github.com/go-go-golems/glazed/pkg/cmds/loaders"
 	"github.com/go-go-golems/glazed/pkg/help"
-	help_cmd "github.com/go-go-golems/glazed/pkg/help/cmd"
+	helpCmd "github.com/go-go-golems/glazed/pkg/help/cmd"
 	"github.com/go-go-golems/glazed/pkg/types"
 	cmds2 "github.com/go-go-golems/oak/pkg/cmds"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	helpCmd "github.com/go-go-golems/glazed/pkg/help/cmd"
 )
 
 var RootCmd = &cobra.Command{
@@ -136,7 +135,8 @@ func createRepositories(repositoryPaths []string, loader loaders.CommandLoader, 
 			RootDocDirectory: "queries/doc",
 			Name:             "oak",
 			SourcePrefix:     "embed",
-		}}
+		},
+	}
 
 	for _, repositoryPath := range repositoryPaths {
 		dir := os.ExpandEnv(repositoryPath)

@@ -28,7 +28,7 @@ func ExtendBindings(variable string, value Expression, bindings Binding) Binding
 	if IsFail(bindings) {
 		return Fail
 	}
-	
+
 	// Create new binding map
 	newBindings := make(Binding)
 	for k, v := range bindings {
@@ -51,12 +51,12 @@ func MatchVariable(pattern Expression, input Expression, bindings Binding) Bindi
 	if IsFail(bindings) {
 		return Fail
 	}
-	
+
 	sym, ok := pattern.(Symbol)
 	if !ok || !IsVariable(pattern) {
 		return Fail
 	}
-	
+
 	variable := sym.Name
 	if binding, exists := GetBinding(variable, bindings); exists {
 		// Variable already bound, check if it matches
@@ -79,7 +79,7 @@ func (b Binding) String() string {
 	if len(b) == 0 {
 		return "{}"
 	}
-	
+
 	result := "{"
 	first := true
 	for k, v := range b {
@@ -95,4 +95,3 @@ func (b Binding) String() string {
 	result += "}"
 	return result
 }
-

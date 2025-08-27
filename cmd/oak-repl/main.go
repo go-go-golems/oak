@@ -117,7 +117,6 @@ func main() {
 	}
 }
 
-
 // collectMatches traverses the expression tree and returns all bindings for matches
 func collectMatches(pattern pm.Expression, expr pm.Expression) []pm.Binding {
 	var out []pm.Binding
@@ -141,5 +140,3 @@ func walkExpressions(expr pm.Expression, fn func(pm.Expression)) {
 		walkExpressions(cons.Cdr, fn)
 	}
 }
-
-

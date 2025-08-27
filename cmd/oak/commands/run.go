@@ -11,8 +11,8 @@ import (
 	"github.com/go-go-golems/glazed/pkg/cmds/alias"
 	"github.com/go-go-golems/glazed/pkg/cmds/loaders"
 	cmds2 "github.com/go-go-golems/oak/pkg/cmds"
-	"github.com/go-go-golems/oak/pkg/tree-sitter/dump"
 	tree_sitter "github.com/go-go-golems/oak/pkg/tree-sitter"
+	"github.com/go-go-golems/oak/pkg/tree-sitter/dump"
 	"github.com/spf13/cobra"
 )
 

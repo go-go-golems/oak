@@ -10,8 +10,8 @@ import (
 	"text/template"
 
 	"github.com/go-go-golems/oak/pkg"
-	"github.com/go-go-golems/oak/pkg/tree-sitter"
 	pm "github.com/go-go-golems/oak/pkg/patternmatcher"
+	"github.com/go-go-golems/oak/pkg/tree-sitter"
 	"github.com/pkg/errors"
 	sitter "github.com/smacker/go-tree-sitter"
 	"gopkg.in/yaml.v3"

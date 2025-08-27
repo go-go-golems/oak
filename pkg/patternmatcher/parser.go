@@ -24,14 +24,14 @@ const (
 func Tokenize(input string) ([]Token, error) {
 	var tokens []Token
 	i := 0
-	
+
 	for i < len(input) {
 		// Skip whitespace
 		if unicode.IsSpace(rune(input[i])) {
 			i++
 			continue
 		}
-		
+
 		switch input[i] {
 		case '(':
 			tokens = append(tokens, Token{TokenLParen, "("})
@@ -54,12 +54,12 @@ func Tokenize(input string) ([]Token, error) {
 		default:
 			// Symbol or number
 			start := i
-			for i < len(input) && !unicode.IsSpace(rune(input[i])) && 
+			for i < len(input) && !unicode.IsSpace(rune(input[i])) &&
 				input[i] != '(' && input[i] != ')' {
 				i++
 			}
 			value := input[start:i]
-			
+
 			// Check if it's a number
 			if _, err := strconv.ParseFloat(value, 64); err == nil {
 				tokens = append(tokens, Token{TokenNumber, value})
@@ -68,7 +68,7 @@ func Tokenize(input string) ([]Token, error) {
 			}
 		}
 	}
-	
+
 	tokens = append(tokens, Token{TokenEOF, ""})
 	return tokens, nil
 }
@@ -98,7 +98,7 @@ func (p *Parser) advance() {
 
 func (p *Parser) ParseExpression() (Expression, error) {
 	token := p.current()
-	
+
 	switch token.Type {
 	case TokenLParen:
 		return p.parseList()
@@ -128,9 +128,9 @@ func (p *Parser) parseList() (Expression, error) {
 		return nil, fmt.Errorf("expected '('")
 	}
 	p.advance() // consume '('
-	
+
 	var elements []Expression
-	
+
 	for p.current().Type != TokenRParen && p.current().Type != TokenEOF {
 		expr, err := p.ParseExpression()
 		if err != nil {
@@ -138,12 +138,12 @@ func (p *Parser) parseList() (Expression, error) {
 		}
 		elements = append(elements, expr)
 	}
-	
+
 	if p.current().Type != TokenRParen {
 		return nil, fmt.Errorf("expected ')'")
 	}
 	p.advance() // consume ')'
-	
+
 	// Convert slice to nested Cons cells
 	return SliceToCons(elements), nil
 }
@@ -153,7 +153,7 @@ func SliceToCons(elements []Expression) Expression {
 	if len(elements) == 0 {
 		return nil
 	}
-	
+
 	result := Cons{Car: elements[len(elements)-1], Cdr: nil}
 	for i := len(elements) - 2; i >= 0; i-- {
 		result = Cons{Car: elements[i], Cdr: result}
@@ -167,7 +167,7 @@ func Parse(input string) (Expression, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	parser := NewParser(tokens)
 	return parser.ParseExpression()
 }
@@ -178,10 +178,10 @@ func ParseAll(input string) ([]Expression, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	parser := NewParser(tokens)
 	var expressions []Expression
-	
+
 	for parser.current().Type != TokenEOF {
 		expr, err := parser.ParseExpression()
 		if err != nil {
@@ -189,7 +189,6 @@ func ParseAll(input string) ([]Expression, error) {
 		}
 		expressions = append(expressions, expr)
 	}
-	
+
 	return expressions, nil
 }
-

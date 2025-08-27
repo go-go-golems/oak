@@ -53,7 +53,7 @@ func (c Cons) String() string {
 	if c.Cdr == nil {
 		return fmt.Sprintf("(%s)", c.Car.String())
 	}
-	
+
 	// Handle proper lists
 	if IsList(c) {
 		elements := []string{}
@@ -70,16 +70,16 @@ func (c Cons) String() string {
 		}
 		return fmt.Sprintf("(%s)", strings.Join(elements, " "))
 	}
-	
+
 	// Improper list
 	return fmt.Sprintf("(%s . %s)", c.Car.String(), c.Cdr.String())
 }
 
 func (c Cons) Equal(other Expression) bool {
 	if cons, ok := other.(Cons); ok {
-		return c.Car.Equal(cons.Car) && 
-			   ((c.Cdr == nil && cons.Cdr == nil) || 
-			    (c.Cdr != nil && cons.Cdr != nil && c.Cdr.Equal(cons.Cdr)))
+		return c.Car.Equal(cons.Car) &&
+			((c.Cdr == nil && cons.Cdr == nil) ||
+				(c.Cdr != nil && cons.Cdr != nil && c.Cdr.Equal(cons.Cdr)))
 	}
 	return false
 }
@@ -105,9 +105,9 @@ func IsVariable(expr Expression) bool {
 func IsSegmentPattern(expr Expression) bool {
 	if cons, ok := expr.(Cons); ok {
 		if sym, ok := cons.Car.(Symbol); ok {
-			return strings.HasPrefix(sym.Name, "?*") || 
-				   strings.HasPrefix(sym.Name, "?+") || 
-				   strings.HasPrefix(sym.Name, "??")
+			return strings.HasPrefix(sym.Name, "?*") ||
+				strings.HasPrefix(sym.Name, "?+") ||
+				strings.HasPrefix(sym.Name, "??")
 		}
 	}
 	return false
@@ -116,11 +116,10 @@ func IsSegmentPattern(expr Expression) bool {
 func IsSinglePattern(expr Expression) bool {
 	if cons, ok := expr.(Cons); ok {
 		if sym, ok := cons.Car.(Symbol); ok {
-			return sym.Name == "?is" || sym.Name == "?and" || 
-				   sym.Name == "?or" || sym.Name == "?not" || 
-				   sym.Name == "?if"
+			return sym.Name == "?is" || sym.Name == "?and" ||
+				sym.Name == "?or" || sym.Name == "?not" ||
+				sym.Name == "?if"
 		}
 	}
 	return false
 }
-
