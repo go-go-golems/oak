@@ -15,7 +15,7 @@ import (
 	"github.com/go-go-golems/glazed/pkg/cmds/layers"
 	"github.com/go-go-golems/glazed/pkg/cmds/loaders"
 	"github.com/go-go-golems/glazed/pkg/help"
-	help_cmd "github.com/go-go-golems/glazed/pkg/help/cmd"
+	helpCmd "github.com/go-go-golems/glazed/pkg/help/cmd"
 	"github.com/go-go-golems/glazed/pkg/types"
 	cmds2 "github.com/go-go-golems/oak/pkg/cmds"
 	"github.com/spf13/cobra"
@@ -34,7 +34,7 @@ func InitRootCmd(docFS embed.FS) (*help.HelpSystem, error) {
 		return nil, err
 	}
 
-	help_cmd.SetupCobraRootCommand(helpSystem, RootCmd)
+	helpCmd.SetupCobraRootCommand(helpSystem, RootCmd)
 
 	err = clay.InitViper("oak", RootCmd)
 	if err != nil {
@@ -42,6 +42,8 @@ func InitRootCmd(docFS embed.FS) (*help.HelpSystem, error) {
 	}
 
 	RootCmd.AddCommand(RunCommandCmd)
+	RootCmd.AddCommand(ASTCmd)
+	RootCmd.AddCommand(PatternCmd)
 	return helpSystem, nil
 }
 
@@ -133,7 +135,8 @@ func createRepositories(repositoryPaths []string, loader loaders.CommandLoader, 
 			RootDocDirectory: "queries/doc",
 			Name:             "oak",
 			SourcePrefix:     "embed",
-		}}
+		},
+	}
 
 	for _, repositoryPath := range repositoryPaths {
 		dir := os.ExpandEnv(repositoryPath)
