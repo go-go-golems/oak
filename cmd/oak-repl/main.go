@@ -2,14 +2,17 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	"github.com/go-go-golems/bobatea/pkg/logutil"
 	"github.com/go-go-golems/bobatea/pkg/repl"
 	"github.com/go-go-golems/oak/pkg/api"
 	pm "github.com/go-go-golems/oak/pkg/patternmatcher"
+	"github.com/rs/zerolog"
 )
 
 type PatternEvaluator struct {
@@ -19,12 +22,109 @@ type PatternEvaluator struct {
 	lispAST         pm.Expression
 }
 
-func (e *PatternEvaluator) Evaluate(ctx context.Context, code string) (string, error) {
-	if len(code) == 0 {
-		return "", nil
+func (e *PatternEvaluator) EvaluateStream(ctx context.Context, code string, emit func(repl.Event)) error {
+	in := strings.TrimSpace(code)
+	if in == "" {
+		return nil
 	}
-	// Regular input (non-slash) not used for now
-	return "", nil
+
+	if strings.HasPrefix(in, "/lang ") {
+		parts := strings.Fields(in)
+		if len(parts) != 2 {
+			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "Usage: /lang <language>"}})
+			return nil
+		}
+		e.currentLanguage = parts[1]
+		emit(repl.Event{Kind: repl.EventLog, Props: map[string]any{"level": "info", "message": "language set", "fields": map[string]any{"language": e.currentLanguage}}})
+		return nil
+	}
+	if strings.HasPrefix(in, "/load ") {
+		parts := strings.Fields(in)
+		if len(parts) != 2 {
+			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "Usage: /load <file>"}})
+			return nil
+		}
+		path := parts[1]
+		b, err := os.ReadFile(path)
+		if err != nil {
+			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": fmt.Sprintf("Error: %v", err)}})
+			return nil
+		}
+		e.currentFile = path
+		e.content = b
+		emit(repl.Event{Kind: repl.EventLog, Props: map[string]any{"level": "info", "message": fmt.Sprintf("loaded %s (%d bytes)", path, len(b))}})
+		return nil
+	}
+	if in == "/ast" {
+		if e.currentLanguage == "" || e.currentFile == "" {
+			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "Usage: /lang <lang> then /load <file>"}})
+			return nil
+		}
+		qb := api.NewQueryBuilder(api.WithLanguage(e.currentLanguage))
+		expr, err := qb.ToLispExpression(ctx, e.currentFile, false)
+		if err != nil {
+			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": fmt.Sprintf("Error: %v", err)}})
+			return nil
+		}
+		e.lispAST = expr
+		emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": expr.String()}})
+		return nil
+	}
+	if strings.HasPrefix(in, "/pattern") {
+		raw := strings.TrimSpace(strings.TrimPrefix(in, "/pattern"))
+		if raw == "" {
+			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "Usage: /pattern <pattern>"}})
+			return nil
+		}
+		if e.lispAST == nil {
+			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "No AST; run /ast first"}})
+			return nil
+		}
+		pat, err := pm.Parse(raw)
+		if err != nil {
+			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": fmt.Sprintf("Error: %v", err)}})
+			return nil
+		}
+		matches := collectMatches(pat, e.lispAST)
+		if len(matches) == 0 {
+			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "NO MATCH"}})
+			return nil
+		}
+		out := fmt.Sprintf("matches: %d\n", len(matches))
+		for i, b := range matches {
+			if pm.IsFail(b) {
+				continue
+			}
+			out += fmt.Sprintf("%d) %s\n", i+1, b.String())
+		}
+		emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": out}})
+		return nil
+	}
+
+	if e.lispAST != nil {
+		pat, err := pm.Parse(in)
+		if err != nil {
+			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": fmt.Sprintf("Error: %v", err)}})
+			return nil
+		}
+		matches := collectMatches(pat, e.lispAST)
+		if len(matches) == 0 {
+			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "NO MATCH"}})
+			return nil
+		}
+		out := fmt.Sprintf("matches: %d\n", len(matches))
+		for i, b := range matches {
+			if pm.IsFail(b) {
+				continue
+			}
+			out += fmt.Sprintf("%d) %s\n", i+1, b.String())
+		}
+		emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": out}})
+		return nil
+	}
+
+	emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "Unknown input. Use /lang, /load, /ast, /pattern"}})
+	return nil
 }
 
 func (e *PatternEvaluator) GetPrompt() string        { return "oak-pattern> " }
@@ -32,86 +132,42 @@ func (e *PatternEvaluator) GetName() string          { return "Oak Pattern Match
 func (e *PatternEvaluator) SupportsMultiline() bool  { return true }
 func (e *PatternEvaluator) GetFileExtension() string { return ".pattern" }
 
+func parseLevel(s string) zerolog.Level {
+	switch strings.ToLower(s) {
+	case "trace":
+		return zerolog.TraceLevel
+	case "debug":
+		return zerolog.DebugLevel
+	case "info":
+		return zerolog.InfoLevel
+	case "warn", "warning":
+		return zerolog.WarnLevel
+	case "error", "err":
+		return zerolog.ErrorLevel
+	default:
+		return zerolog.ErrorLevel
+	}
+}
+
 func main() {
+	// CLI flags for logging
+	ll := flag.String("log-level", "error", "log level: trace, debug, info, warn, error")
+	lf := flag.String("log-file", "", "log file path (optional)")
+	flag.Parse()
+
+	level := parseLevel(*ll)
+	if *lf != "" {
+		logutil.InitTUILoggingToFile(level, *lf)
+	} else {
+		logutil.InitTUILoggingToDiscard(level)
+	}
+
 	evaluator := &PatternEvaluator{}
 	config := repl.DefaultConfig()
 	config.Title = "Oak Pattern Matcher REPL"
 	config.Prompt = "oak> "
 
-	model := repl.NewModel(evaluator, config)
-	model.SetTheme(repl.BuiltinThemes["dark"])
-
-	// /lang <language>
-	model.AddCustomCommand("lang", func(args []string) tea.Cmd {
-		return func() tea.Msg {
-			if len(args) != 1 {
-				return repl.EvaluationCompleteMsg{Input: "/lang", Output: "usage: /lang <language>", Error: fmt.Errorf("invalid usage")}
-			}
-			evaluator.currentLanguage = args[0]
-			return repl.EvaluationCompleteMsg{Input: "/lang " + args[0], Output: "language set", Error: nil}
-		}
-	})
-
-	// /load <file>
-	model.AddCustomCommand("load", func(args []string) tea.Cmd {
-		return func() tea.Msg {
-			if len(args) != 1 {
-				return repl.EvaluationCompleteMsg{Input: "/load", Output: "usage: /load <file>", Error: fmt.Errorf("invalid usage")}
-			}
-			b, err := os.ReadFile(args[0])
-			if err != nil {
-				return repl.EvaluationCompleteMsg{Input: "/load " + args[0], Output: err.Error(), Error: err}
-			}
-			evaluator.currentFile = args[0]
-			evaluator.content = b
-			return repl.EvaluationCompleteMsg{Input: "/load " + args[0], Output: fmt.Sprintf("loaded %s (%d bytes)", args[0], len(b)), Error: nil}
-		}
-	})
-
-	// /ast
-	model.AddCustomCommand("ast", func(args []string) tea.Cmd {
-		return func() tea.Msg {
-			if evaluator.currentLanguage == "" || evaluator.currentFile == "" {
-				return repl.EvaluationCompleteMsg{Input: "/ast", Output: "usage: /lang <lang> then /load <file>", Error: fmt.Errorf("missing context")}
-			}
-			qb := api.NewQueryBuilder(api.WithLanguage(evaluator.currentLanguage))
-			expr, err := qb.ToLispExpression(context.Background(), evaluator.currentFile, false)
-			if err != nil {
-				return repl.EvaluationCompleteMsg{Input: "/ast", Output: err.Error(), Error: err}
-			}
-			evaluator.lispAST = expr
-			return repl.EvaluationCompleteMsg{Input: "/ast", Output: expr.String(), Error: nil}
-		}
-	})
-
-	// /pattern <pattern>
-	model.AddCustomCommandRaw("pattern", func(raw string, args []string) tea.Cmd {
-		return func() tea.Msg {
-			if evaluator.lispAST == nil {
-				return repl.EvaluationCompleteMsg{Input: "/pattern", Output: "no AST; run /ast first", Error: fmt.Errorf("no ast")}
-			}
-			patternStr := raw
-			pat, err := pm.Parse(patternStr)
-			if err != nil {
-				return repl.EvaluationCompleteMsg{Input: "/pattern", Output: err.Error(), Error: err}
-			}
-			matches := collectMatches(pat, evaluator.lispAST)
-			if len(matches) == 0 {
-				return repl.EvaluationCompleteMsg{Input: "/pattern", Output: "NO MATCH", Error: nil}
-			}
-			out := fmt.Sprintf("matches: %d\n", len(matches))
-			for i, b := range matches {
-				if pm.IsFail(b) {
-					continue
-				}
-				out += fmt.Sprintf("%d) %s\n", i+1, b.String())
-			}
-			return repl.EvaluationCompleteMsg{Input: "/pattern", Output: out, Error: nil}
-		}
-	})
-
-	p := tea.NewProgram(model, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
+	if err := repl.RunTimelineRepl(evaluator, config); err != nil {
 		log.Println(err)
 		os.Exit(1)
 	}
