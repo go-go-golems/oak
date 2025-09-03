@@ -485,8 +485,8 @@ func loadHelpMarkdownBySlug(slug string) (string, error) {
 	return "", fmt.Errorf("help topic not found: %s", slug)
 }
 
-func splitFrontMatter(s string) (yamlPart string, body string) {
-	s := strings.TrimSpace(s)
+func splitFrontMatter(content string) (yamlPart string, body string) {
+	s := strings.TrimSpace(content)
 	if !strings.HasPrefix(s, "---") {
 		return "", s
 	}
