@@ -36,6 +36,9 @@ func InitRootCmd(docFS embed.FS) (*help.HelpSystem, error) {
 
 	helpCmd.SetupCobraRootCommand(helpSystem, RootCmd)
 
+	// REPL-style help as a CLI command for testing the backend abstraction
+	RootCmd.AddCommand(NewReplHelpCmd(helpSystem))
+
 	err = clay.InitViper("oak", RootCmd)
 	if err != nil {
 		return nil, err
