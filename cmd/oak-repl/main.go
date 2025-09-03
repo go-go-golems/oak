@@ -12,6 +12,8 @@ import (
 
 	"github.com/go-go-golems/bobatea/pkg/logutil"
 	"github.com/go-go-golems/bobatea/pkg/repl"
+	"github.com/go-go-golems/bobatea/pkg/repl/slash"
+	"github.com/go-go-golems/bobatea/pkg/autocomplete"
 	replhelp "github.com/go-go-golems/bobatea/pkg/repl/help"
 	helpadapters "github.com/go-go-golems/bobatea/pkg/repl/help/adapters"
 	"github.com/go-go-golems/glazed/pkg/help"
@@ -22,7 +24,6 @@ import (
 	tsdump "github.com/go-go-golems/oak/pkg/tree-sitter/dump"
 	"github.com/rs/zerolog"
 	sitter "github.com/smacker/go-tree-sitter"
-	"gopkg.in/yaml.v3"
 )
 
 var astFenceLang string
@@ -89,209 +90,10 @@ func (e *PatternEvaluator) EvaluateStream(ctx context.Context, code string, emit
 		return nil
 	}
 
-	if strings.HasPrefix(in, "/lang ") {
-		parts := strings.Fields(in)
-		if len(parts) != 2 {
-			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "Usage: /lang <language>"}})
-			return nil
-		}
-		e.currentLanguage = parts[1]
-		emit(repl.Event{Kind: repl.EventLog, Props: map[string]any{"level": "info", "message": "language set", "fields": map[string]any{"language": e.currentLanguage}}})
-		return nil
-	}
-	if strings.HasPrefix(in, "/load ") {
-		parts := strings.Fields(in)
-		if len(parts) != 2 {
-			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "Usage: /load <file>"}})
-			return nil
-		}
-		path := parts[1]
-		b, err := os.ReadFile(path)
-		if err != nil {
-			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": fmt.Sprintf("Error: %v", err)}})
-			return nil
-		}
-		e.currentFile = path
-		e.content = b
-		// infer language from file extension if not set
-		if lang := inferLanguageFromFilename(path); lang != "" {
-			e.currentLanguage = lang
-		}
-		emit(repl.Event{Kind: repl.EventLog, Props: map[string]any{"level": "info", "message": fmt.Sprintf("loaded %s (%d bytes)", path, len(b)), "fields": map[string]any{"language": e.currentLanguage}}})
-		return nil
-	}
-	if strings.HasPrefix(in, "/help") {
-		backend := &helpadapters.GlazedBackend{HS: helpSys}
-		md := replhelp.HandleHelpCommand(ctx, replhelp.Config{
-			Backend:     backend,
-			ShowRelated: true,
-			Renderer:    replhelp.DefaultRenderer(),
-		}, in)
-		emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": md}})
-		return nil
-	}
-	if strings.HasPrefix(in, "/ast") {
-		// /ast [outFile]
-		parts := strings.Fields(in)
-		var outFile string
-		if len(parts) >= 2 {
-			outFile = parts[1]
-		}
-		if e.currentFile == "" || len(e.content) == 0 {
-			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "No file loaded. Use /load <file> first."}})
-			return nil
-		}
-		if e.currentLanguage == "" {
-			if lang := inferLanguageFromFilename(e.currentFile); lang != "" {
-				e.currentLanguage = lang
-			}
-		}
-		qb := api.NewQueryBuilder(api.WithLanguage(e.currentLanguage))
-		expr, err := qb.ToLispExpression(ctx, e.currentFile, false)
-		if err != nil {
-			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": fmt.Sprintf("Error: %v", err)}})
-			return nil
-		}
-		e.lispAST = expr
-		pp := prettyPrintLisp(expr, e.currentLanguage)
-		if outFile != "" {
-			if err := safeWriteFile(outFile, []byte(pp)); err != nil {
-				emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": fmt.Sprintf("Error writing %s: %v", outFile, err)}})
-				return nil
-			}
-			emit(repl.Event{Kind: repl.EventLog, Props: map[string]any{"level": "info", "message": fmt.Sprintf("AST written to %s", outFile)}})
-			return nil
-		}
-		md := "```" + astFenceLang + "\n" + pp + "\n```"
-		emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": md}})
-		return nil
-	}
-	if strings.HasPrefix(in, "/raw-ast") {
-		// /raw-ast [outFile]
-		parts := strings.Fields(in)
-		var outFile string
-		if len(parts) >= 2 {
-			outFile = parts[1]
-		}
-		if e.currentFile == "" || len(e.content) == 0 {
-			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "No file loaded. Use /load <file> first."}})
-			return nil
-		}
-		if e.currentLanguage == "" {
-			if lang := inferLanguageFromFilename(e.currentFile); lang != "" {
-				e.currentLanguage = lang
-			}
-		}
-		lang, err := pkg.LanguageNameToSitterLanguage(e.currentLanguage)
-		if err != nil {
-			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": fmt.Sprintf("Error: %v", err)}})
-			return nil
-		}
-		parser := sitter.NewParser()
-		parser.SetLanguage(lang)
-		tree, err := parser.ParseCtx(ctx, nil, e.content)
-		if err != nil {
-			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": fmt.Sprintf("Error: %v", err)}})
-			return nil
-		}
-		defer tree.Close()
-		var buf bytes.Buffer
-		tsdump.DumpVerboseAST(tree.RootNode(), e.content, &buf)
-		if outFile != "" {
-			if err := safeWriteFile(outFile, buf.Bytes()); err != nil {
-				emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": fmt.Sprintf("Error writing %s: %v", outFile, err)}})
-				return nil
-			}
-			emit(repl.Event{Kind: repl.EventLog, Props: map[string]any{"level": "info", "message": fmt.Sprintf("Raw AST written to %s", outFile)}})
-			return nil
-		}
-		md := "```text\n" + buf.String() + "\n```"
-		emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": md}})
-		return nil
-	}
-	if strings.HasPrefix(in, "/yaml-ast") {
-		// /yaml-ast [outFile]
-		parts := strings.Fields(in)
-		var outFile string
-		if len(parts) >= 2 {
-			outFile = parts[1]
-		}
-		if e.currentFile == "" || len(e.content) == 0 {
-			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "No file loaded. Use /load <file> first."}})
-			return nil
-		}
-		if e.currentLanguage == "" {
-			if lang := inferLanguageFromFilename(e.currentFile); lang != "" {
-				e.currentLanguage = lang
-			}
-		}
-		lang, err := pkg.LanguageNameToSitterLanguage(e.currentLanguage)
-		if err != nil {
-			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": fmt.Sprintf("Error: %v", err)}})
-			return nil
-		}
-		parser := sitter.NewParser()
-		parser.SetLanguage(lang)
-		tree, err := parser.ParseCtx(ctx, nil, e.content)
-		if err != nil {
-			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": fmt.Sprintf("Error: %v", err)}})
-			return nil
-		}
-		defer tree.Close()
-		var buf bytes.Buffer
-		dumper := tsdump.NewDumper(tsdump.Format("yaml"))
-		opts := tsdump.Options{ShowBytes: true, ShowContent: true, ShowAttributes: true, SkipWhitespace: false}
-		if err := dumper.Dump(tree, e.content, &buf, opts); err != nil {
-			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": fmt.Sprintf("Error: %v", err)}})
-			return nil
-		}
-		if outFile != "" {
-			if err := safeWriteFile(outFile, buf.Bytes()); err != nil {
-				emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": fmt.Sprintf("Error writing %s: %v", outFile, err)}})
-				return nil
-			}
-			emit(repl.Event{Kind: repl.EventLog, Props: map[string]any{"level": "info", "message": fmt.Sprintf("YAML AST written to %s", outFile)}})
-			return nil
-		}
-		md := "```yaml\n" + buf.String() + "\n```"
-		emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": md}})
-		return nil
-	}
-
-	if strings.HasPrefix(in, "/pattern") {
-		raw := strings.TrimSpace(strings.TrimPrefix(in, "/pattern"))
-		if raw == "" {
-			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "Usage: /pattern <pattern>"}})
-			return nil
-		}
-		if e.lispAST == nil {
-			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "No AST; run /ast first"}})
-			return nil
-		}
-		pat, err := pm.Parse(raw)
-		if err != nil {
-			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": fmt.Sprintf("Error: %v", err)}})
-			return nil
-		}
-		matches := collectMatches(pat, e.lispAST)
-		if len(matches) == 0 {
-			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "NO MATCH"}})
-			return nil
-		}
-		var b strings.Builder
-		for i, bind := range matches {
-			if pm.IsFail(bind) {
-				continue
-			}
-			if i > 0 {
-				b.WriteString("\n\n")
-			}
-			b.WriteString("```" + astFenceLang + "\n")
-			b.WriteString(bind.String())
-			b.WriteString("\n```")
-		}
-		md := fmt.Sprintf("matches: %d\n\n%s", len(matches), b.String())
-		emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": md}})
+	// All /commands are handled by the REPL slash-command dispatcher before EvaluateStream.
+	// If any slipped through, just show a brief notice.
+	if strings.HasPrefix(in, "/") {
+		emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "Unknown command. Type /help for available commands."}})
 		return nil
 	}
 
@@ -323,7 +125,7 @@ func (e *PatternEvaluator) EvaluateStream(ctx context.Context, code string, emit
 		return nil
 	}
 
-	emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "Unknown input. Use /lang, /load, /ast, /raw-ast, /yaml-ast, /pattern"}})
+	emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "Unknown input. Type /help for commands or load an AST and enter a pattern."}})
 	return nil
 }
 
@@ -382,11 +184,257 @@ func main() {
 	config.Title = "Oak Pattern Matcher REPL"
 	config.Prompt = "oak> "
 	config.HelperMarkdown = patternCheatSheet()
+	// Use ESC to toggle between input and timeline focus (so Tab can be used for completion)
+	config.FocusToggleKey = "esc"
 
-	if err := repl.RunTimelineRepl(evaluator, config); err != nil {
+	bus, model, p, err := repl.NewTimelineRepl(evaluator, config)
+	if err != nil {
 		log.Println(err)
 		os.Exit(1)
 	}
+
+	// Register slash commands
+	registerSlashCommands(model.SlashRegistry(), evaluator)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	errs := make(chan error, 2)
+	go func() { errs <- bus.Run(ctx) }()
+	go func() { _, e := p.Run(); cancel(); errs <- e }()
+	if e := <-errs; e != nil {
+		log.Println(e)
+		os.Exit(1)
+	}
+}
+
+func registerSlashCommands(reg slash.Registry, e *PatternEvaluator) {
+    // /help
+    reg.Register(&slash.Command{
+        Name:    "help",
+        Summary: "Show help topics, examples, and tutorials",
+        Usage:   "/help [slug] [--all] [--query=DSL]",
+        Schema:  slash.Schema{},
+        Run: func(ctx context.Context, in slash.Input, emit slash.Emitter) error {
+            backend := &helpadapters.GlazedBackend{HS: helpSys}
+            // rebuild input line minimally
+            s := "/help"
+            if len(in.Positionals) > 0 { s += " " + in.Positionals[0] }
+            if _, ok := in.Flags["all"]; ok { s += " --all" }
+            if qv, ok := in.Flags["query"]; ok && len(qv) > 0 { s += " --query=\"" + qv[0] + "\"" }
+            md := replhelp.HandleHelpCommand(ctx, replhelp.Config{
+                Backend:     backend,
+                ShowRelated: true,
+                Renderer:    replhelp.DefaultRenderer(),
+            }, s)
+            emit(string(repl.EventResultMarkdown), map[string]any{"markdown": md})
+            return nil
+        },
+        Complete: func(ctx context.Context, st slash.CompletionState) ([]autocomplete.Suggestion, error) {
+            // suggest slugs from top-level page when completing first positional
+            if st.Phase != slash.PhasePositional || st.PositionalIndex != 0 { return nil, nil }
+            page := helpSys.GetTopLevelHelpPage()
+            var ss []autocomplete.Suggestion
+            add := func(sections []*help.Section) {
+                for _, s := range sections {
+                    if st.Partial == "" || strings.HasPrefix(s.Slug, st.Partial) {
+                        disp := s.Slug
+                        if strings.TrimSpace(s.Title) != "" { disp += " — " + s.Title }
+                        ss = append(ss, autocomplete.Suggestion{Id: s.Slug, Value: s.Slug, DisplayText: disp})
+                    }
+                }
+            }
+            add(page.AllGeneralTopics)
+            add(page.AllExamples)
+            add(page.AllApplications)
+            add(page.AllTutorials)
+            return ss, nil
+        },
+    })
+
+    // /lang
+    reg.Register(&slash.Command{
+        Name:    "lang",
+        Summary: "Set current language",
+        Usage:   "/lang <language>",
+        Run: func(ctx context.Context, in slash.Input, emit slash.Emitter) error {
+            if len(in.Positionals) < 1 {
+                emit(string(repl.EventResultMarkdown), map[string]any{"markdown": "Usage: /lang <language>"})
+                return nil
+            }
+            e.currentLanguage = in.Positionals[0]
+            emit(string(repl.EventLog), map[string]any{"level": "info", "message": "language set", "fields": map[string]any{"language": e.currentLanguage}})
+            return nil
+        },
+    })
+
+    // /load
+    reg.Register(&slash.Command{
+        Name:    "load",
+        Summary: "Load a source file and infer language",
+        Usage:   "/load <file>",
+        Run: func(ctx context.Context, in slash.Input, emit slash.Emitter) error {
+            if len(in.Positionals) < 1 {
+                emit(string(repl.EventResultMarkdown), map[string]any{"markdown": "Usage: /load <file>"})
+                return nil
+            }
+            path := in.Positionals[0]
+            b, err := os.ReadFile(path)
+            if err != nil {
+                emit(string(repl.EventResultMarkdown), map[string]any{"markdown": fmt.Sprintf("Error: %v", err)})
+                return nil
+            }
+            e.currentFile = path
+            e.content = b
+            if lang := inferLanguageFromFilename(path); lang != "" { e.currentLanguage = lang }
+            emit(string(repl.EventLog), map[string]any{"level": "info", "message": fmt.Sprintf("loaded %s (%d bytes)", path, len(b)), "fields": map[string]any{"language": e.currentLanguage}})
+            return nil
+        },
+    })
+
+    // /ast
+    reg.Register(&slash.Command{
+        Name:    "ast",
+        Summary: "Pretty-print Lisp AST",
+        Usage:   "/ast [outFile]",
+        Run: func(ctx context.Context, in slash.Input, emit slash.Emitter) error {
+            var outFile string
+            if len(in.Positionals) >= 1 { outFile = in.Positionals[0] }
+            if e.currentFile == "" || len(e.content) == 0 {
+                emit(string(repl.EventResultMarkdown), map[string]any{"markdown": "No file loaded. Use /load <file> first."})
+                return nil
+            }
+            if e.currentLanguage == "" { if lang := inferLanguageFromFilename(e.currentFile); lang != "" { e.currentLanguage = lang } }
+            qb := api.NewQueryBuilder(api.WithLanguage(e.currentLanguage))
+            expr, err := qb.ToLispExpression(ctx, e.currentFile, false)
+            if err != nil {
+                emit(string(repl.EventResultMarkdown), map[string]any{"markdown": fmt.Sprintf("Error: %v", err)})
+                return nil
+            }
+            e.lispAST = expr
+            pp := prettyPrintLisp(expr, e.currentLanguage)
+            if outFile != "" {
+                if err := safeWriteFile(outFile, []byte(pp)); err != nil {
+                    emit(string(repl.EventResultMarkdown), map[string]any{"markdown": fmt.Sprintf("Error writing %s: %v", outFile, err)})
+                    return nil
+                }
+                emit(string(repl.EventLog), map[string]any{"level": "info", "message": fmt.Sprintf("AST written to %s", outFile)})
+                return nil
+            }
+            md := "```" + astFenceLang + "\n" + pp + "\n```"
+            emit(string(repl.EventResultMarkdown), map[string]any{"markdown": md})
+            return nil
+        },
+    })
+
+    // /raw-ast
+    reg.Register(&slash.Command{
+        Name:    "raw-ast",
+        Summary: "Verbose tree with positions/bytes/flags",
+        Usage:   "/raw-ast [outFile]",
+        Run: func(ctx context.Context, in slash.Input, emit slash.Emitter) error {
+            var outFile string
+            if len(in.Positionals) >= 1 { outFile = in.Positionals[0] }
+            if e.currentFile == "" || len(e.content) == 0 {
+                emit(string(repl.EventResultMarkdown), map[string]any{"markdown": "No file loaded. Use /load <file> first."})
+                return nil
+            }
+            if e.currentLanguage == "" { if lang := inferLanguageFromFilename(e.currentFile); lang != "" { e.currentLanguage = lang } }
+            lang, err := pkg.LanguageNameToSitterLanguage(e.currentLanguage)
+            if err != nil {
+                emit(string(repl.EventResultMarkdown), map[string]any{"markdown": fmt.Sprintf("Error: %v", err)})
+                return nil
+            }
+            parser := sitter.NewParser()
+            parser.SetLanguage(lang)
+            tree, err := parser.ParseCtx(ctx, nil, e.content)
+            if err != nil { emit(string(repl.EventResultMarkdown), map[string]any{"markdown": fmt.Sprintf("Error: %v", err)}); return nil }
+            defer tree.Close()
+            var buf bytes.Buffer
+            tsdump.DumpVerboseAST(tree.RootNode(), e.content, &buf)
+            if outFile != "" {
+                if err := safeWriteFile(outFile, buf.Bytes()); err != nil {
+                    emit(string(repl.EventResultMarkdown), map[string]any{"markdown": fmt.Sprintf("Error writing %s: %v", outFile, err)})
+                    return nil
+                }
+                emit(string(repl.EventLog), map[string]any{"level": "info", "message": fmt.Sprintf("Raw AST written to %s", outFile)})
+                return nil
+            }
+            md := "```text\n" + buf.String() + "\n```"
+            emit(string(repl.EventResultMarkdown), map[string]any{"markdown": md})
+            return nil
+        },
+    })
+
+    // /yaml-ast
+    reg.Register(&slash.Command{
+        Name:    "yaml-ast",
+        Summary: "Full YAML dump of the AST",
+        Usage:   "/yaml-ast [outFile]",
+        Run: func(ctx context.Context, in slash.Input, emit slash.Emitter) error {
+            var outFile string
+            if len(in.Positionals) >= 1 { outFile = in.Positionals[0] }
+            if e.currentFile == "" || len(e.content) == 0 {
+                emit(string(repl.EventResultMarkdown), map[string]any{"markdown": "No file loaded. Use /load <file> first."})
+                return nil
+            }
+            if e.currentLanguage == "" { if lang := inferLanguageFromFilename(e.currentFile); lang != "" { e.currentLanguage = lang } }
+            lang, err := pkg.LanguageNameToSitterLanguage(e.currentLanguage)
+            if err != nil { emit(string(repl.EventResultMarkdown), map[string]any{"markdown": fmt.Sprintf("Error: %v", err)}); return nil }
+            parser := sitter.NewParser()
+            parser.SetLanguage(lang)
+            tree, err := parser.ParseCtx(ctx, nil, e.content)
+            if err != nil { emit(string(repl.EventResultMarkdown), map[string]any{"markdown": fmt.Sprintf("Error: %v", err)}); return nil }
+            defer tree.Close()
+            var buf bytes.Buffer
+            dumper := tsdump.NewDumper(tsdump.Format("yaml"))
+            opts := tsdump.Options{ShowBytes: true, ShowContent: true, ShowAttributes: true, SkipWhitespace: false}
+            if err := dumper.Dump(tree, e.content, &buf, opts); err != nil { emit(string(repl.EventResultMarkdown), map[string]any{"markdown": fmt.Sprintf("Error: %v", err)}); return nil }
+            if outFile != "" {
+                if err := safeWriteFile(outFile, buf.Bytes()); err != nil { emit(string(repl.EventResultMarkdown), map[string]any{"markdown": fmt.Sprintf("Error writing %s: %v", outFile, err)}); return nil }
+                emit(string(repl.EventLog), map[string]any{"level": "info", "message": fmt.Sprintf("YAML AST written to %s", outFile)})
+                return nil
+            }
+            md := "```yaml\n" + buf.String() + "\n```"
+            emit(string(repl.EventResultMarkdown), map[string]any{"markdown": md})
+            return nil
+        },
+    })
+
+    // /pattern
+    reg.Register(&slash.Command{
+        Name:    "pattern",
+        Summary: "Run a pattern match against current AST",
+        Usage:   "/pattern <pattern>",
+        Run: func(ctx context.Context, in slash.Input, emit slash.Emitter) error {
+            if len(in.Positionals) < 1 {
+                emit(string(repl.EventResultMarkdown), map[string]any{"markdown": "Usage: /pattern <pattern>"})
+                return nil
+            }
+            if e.lispAST == nil {
+                emit(string(repl.EventResultMarkdown), map[string]any{"markdown": "No AST; run /ast first"})
+                return nil
+            }
+            raw := strings.TrimSpace(in.Positionals[0])
+            pat, err := pm.Parse(raw)
+            if err != nil {
+                emit(string(repl.EventResultMarkdown), map[string]any{"markdown": fmt.Sprintf("Error: %v", err)})
+                return nil
+            }
+            matches := collectMatches(pat, e.lispAST)
+            if len(matches) == 0 { emit(string(repl.EventResultMarkdown), map[string]any{"markdown": "NO MATCH"}); return nil }
+            var b strings.Builder
+            for i, bind := range matches {
+                if pm.IsFail(bind) { continue }
+                if i > 0 { b.WriteString("\n\n") }
+                b.WriteString("```" + astFenceLang + "\n")
+                b.WriteString(bind.String())
+                b.WriteString("\n```")
+            }
+            md := fmt.Sprintf("matches: %d\n\n%s", len(matches), b.String())
+            emit(string(repl.EventResultMarkdown), map[string]any{"markdown": md})
+            return nil
+        },
+    })
 }
 
 // collectMatches traverses the expression tree and returns all bindings for matches
@@ -457,34 +505,6 @@ func safeWriteFile(path string, data []byte) error {
 		return err
 	}
 	return os.WriteFile(path, data, 0o644) // #nosec G306
-}
-
-func loadHelpMarkdownBySlug(slug string) (string, error) {
-	dir := "glazed/pkg/doc/topics"
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return "", err
-	}
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
-			continue
-		}
-		path := filepath.Join(dir, e.Name())
-		b, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		fm, body := splitFrontMatter(string(b))
-		var meta struct{ Slug string `yaml:"Slug"`; Title string `yaml:"Title"` }
-		if fm != "" {
-			_ = yaml.Unmarshal([]byte(fm), &meta)
-		}
-		nameSlug := strings.TrimSuffix(e.Name(), filepath.Ext(e.Name()))
-		if strings.EqualFold(meta.Slug, slug) || strings.EqualFold(meta.Title, slug) || strings.EqualFold(nameSlug, slug) {
-			return body, nil
-		}
-	}
-	return "", fmt.Errorf("help topic not found: %s", slug)
 }
 
 func splitFrontMatter(content string) (yamlPart string, body string) {

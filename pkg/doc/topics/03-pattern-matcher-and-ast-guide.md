@@ -1,6 +1,20 @@
-# Pattern Matcher + Tree-sitter: Getting Started
+---
+Title: Pattern Matcher + Tree-sitter - Getting Started
+Slug: pattern-matcher-and-ast-guide
+Short: Explore Oak's PAIP-style pattern matcher over Tree-sitter ASTs via CLI and REPL.
+Topics:
+- oak
+- pattern-matcher
+- tree-sitter
+- repl
+- cli
+IsTopLevel: true
+IsTemplate: false
+ShowPerDefault: true
+SectionType: GeneralTopic
+---
 
-This guide shows how to use Oak's new PAIP-style pattern matcher on top of Tree-sitter ASTs. You'll learn to:
+This guide introduces Oak's PAIP-style pattern matcher layered on top of Tree-sitter ASTs, with both CLI and REPL workflows.
 
 - Dump ASTs in multiple formats
 - Convert ASTs to Lisp S-expressions
@@ -9,12 +23,18 @@ This guide shows how to use Oak's new PAIP-style pattern matcher on top of Tree-
 
 ## Prerequisites
 
+Make sure your Go toolchain is installed and the Oak repository is available locally.
+
 - Go 1.24+
 - Oak repository checked out (this project)
 
 ## Quick Tour
 
+Start by inspecting ASTs in multiple formats, then run patterns and iterate interactively.
+
 ### 1) AST inspection (CLI)
+
+Dump ASTs in formats suited for human inspection or downstream processing.
 
 Use `ast` to print ASTs in different formats:
 
@@ -39,6 +59,8 @@ Flags:
 - `--include-anonymous`: include anonymous nodes in Lisp output
 
 ### 2) Run PAIP patterns (CLI)
+
+Execute structure-first patterns and refine results with flags or post-processing.
 
 The `pattern` command runs PAIP patterns anywhere in the converted AST:
 
@@ -79,6 +101,8 @@ Notes:
 
 ### 3) Interactive REPL
 
+Iterate quickly on patterns with a live AST context and built-in commands.
+
 Start the REPL to iterate on patterns quickly:
 
 ```bash
@@ -108,6 +132,8 @@ Tips:
 - `/help` shows built-in REPL commands.
 
 ## Writing Patterns
+
+Patterns operate on the Lisp-ified AST. Build from small matches to composed queries.
 
 PAIP patterns operate over the Lisp-ified AST. A few building blocks:
 
@@ -142,6 +168,8 @@ Examples:
 
 ## Programmatic API
 
+Convert files to Lisp expressions and evaluate patterns directly from Go.
+
 Convert a file to a Lisp expression and evaluate a pattern in Go:
 
 ```go
@@ -158,6 +186,8 @@ if !patternmatcher.IsFail(b) {
 
 ## Troubleshooting
 
+Verify language and input context; prefer CLI for large files when exploring.
+
 - No matches with structure-heavy patterns? Start by inspecting the Lisp AST with:
   ```bash
   go run ./cmd/oak ast --language go --format lisp ./yourfile.go | less
@@ -166,6 +196,8 @@ if !patternmatcher.IsFail(b) {
 - For large files, prefer CLI for performance; REPL is best for iteration.
 
 ## Roadmap / Extensibility
+
+Future work focuses on richer predicates, sequence matching, and multi-file constraints.
 
 - Add domain predicates (e.g., `identifier-screaming-snake-p`, `jsx-element-p`).
 - Segment patterns over tree contexts for repetitive structures.

@@ -1,4 +1,20 @@
-# Oak Programmatic API
+---
+Title: Oak Programmatic API
+Slug: programmatic-oak-api
+Short: Programmatic, type-safe tree-sitter queries with template and Go processing.
+Topics:
+- oak
+- api
+- tree-sitter
+- queries
+- go
+- templates
+- processing
+IsTopLevel: true
+IsTemplate: false
+ShowPerDefault: true
+SectionType: GeneralTopic
+---
 
 ## Introduction
 
@@ -14,6 +30,8 @@ This guide covers everything you need to know to use the Oak API effectively in 
 
 ## Installation
 
+Install Oak and import the API to start building and running programmatic queries.
+
 The Oak API is part of the Oak package. To use it in your project:
 
 ```bash
@@ -27,6 +45,8 @@ import "github.com/go-go-golems/oak/pkg/api"
 ```
 
 ## Core Concepts
+
+The API separates query construction, execution, and result handling to keep concerns clear and composable.
 
 ### Query Building
 
@@ -158,6 +178,8 @@ if !ok {
 
 ## API Reference
 
+This section summarizes the primary types and functions you'll use.
+
 ### QueryBuilder
 
 ```go
@@ -248,6 +270,8 @@ type tree_sitter.Point struct {
 ```
 
 ## Complete Examples
+
+The following end-to-end programs demonstrate template-based and programmatic processing.
 
 ### Example 1: Analyzing Go Functions
 
@@ -780,6 +804,8 @@ func(api.QueryResults) (bool, error)
 The API uses type assertion to determine which function signature is being used.
 
 ## Advanced Topics
+
+Use these options and practices to scale to large codebases and complex queries.
 
 ### Performance Considerations
 
