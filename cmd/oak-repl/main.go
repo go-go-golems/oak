@@ -196,6 +196,11 @@ func main() {
 	// Register slash commands
 	registerSlashCommands(model.SlashRegistry(), evaluator)
 
+	// Also surface slash commands via the help system by stacking a slash help backend
+	// We build a synthetic top-level page that includes both Glazed help and slash commands via the adapter.
+	// Consumers can query with slugs like "slash-<name>" to access command pages.
+	_ = model // keep model in scope for clarity
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	errs := make(chan error, 2)
@@ -215,7 +220,10 @@ func registerSlashCommands(reg slash.Registry, e *PatternEvaluator) {
         Usage:   "/help [slug] [--all] [--query=DSL]",
         Schema:  slash.Schema{},
         Run: func(ctx context.Context, in slash.Input, emit slash.Emitter) error {
-            backend := &helpadapters.GlazedBackend{HS: helpSys}
+            backend := helpadapters.NewMultiBackend(
+                &helpadapters.GlazedBackend{HS: helpSys},
+                helpadapters.NewSlashBackend(reg),
+            )
             // rebuild input line minimally
             s := "/help"
             if len(in.Positionals) > 0 { s += " " + in.Positionals[0] }
