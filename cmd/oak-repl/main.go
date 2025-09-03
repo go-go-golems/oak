@@ -18,6 +18,7 @@ import (
 	tsdump "github.com/go-go-golems/oak/pkg/tree-sitter/dump"
 	"github.com/rs/zerolog"
 	sitter "github.com/smacker/go-tree-sitter"
+	"gopkg.in/yaml.v3"
 )
 
 var astFenceLang string
@@ -112,6 +113,23 @@ func (e *PatternEvaluator) EvaluateStream(ctx context.Context, code string, emit
 			e.currentLanguage = lang
 		}
 		emit(repl.Event{Kind: repl.EventLog, Props: map[string]any{"level": "info", "message": fmt.Sprintf("loaded %s (%d bytes)", path, len(b)), "fields": map[string]any{"language": e.currentLanguage}}})
+		return nil
+	}
+	if strings.HasPrefix(in, "/help") {
+		// /help [topic]
+		parts := strings.Fields(in)
+		if len(parts) == 1 {
+			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": builtinHelpMarkdown()}})
+			return nil
+		}
+		topic := strings.TrimSpace(parts[1])
+		md, err := loadHelpMarkdownBySlug(topic)
+		if err != nil || strings.TrimSpace(md) == "" {
+			// fallback to built-in
+			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": builtinHelpMarkdown()}})
+			return nil
+		}
+		emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": md}})
 		return nil
 	}
 	if strings.HasPrefix(in, "/ast") {
@@ -241,6 +259,7 @@ func (e *PatternEvaluator) EvaluateStream(ctx context.Context, code string, emit
 		emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": md}})
 		return nil
 	}
+
 	if strings.HasPrefix(in, "/pattern") {
 		raw := strings.TrimSpace(strings.TrimPrefix(in, "/pattern"))
 		if raw == "" {
@@ -306,7 +325,7 @@ func (e *PatternEvaluator) EvaluateStream(ctx context.Context, code string, emit
 		return nil
 	}
 
-	emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "Unknown input. Use /lang, /load, /ast, /raw-ast, /pattern"}})
+	emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "Unknown input. Use /lang, /load, /ast, /raw-ast, /yaml-ast, /pattern"}})
 	return nil
 }
 
@@ -360,6 +379,7 @@ func main() {
 	config := repl.DefaultConfig()
 	config.Title = "Oak Pattern Matcher REPL"
 	config.Prompt = "oak> "
+	config.HelperMarkdown = patternCheatSheet()
 
 	if err := repl.RunTimelineRepl(evaluator, config); err != nil {
 		log.Println(err)
@@ -389,164 +409,6 @@ func walkExpressions(expr pm.Expression, fn func(pm.Expression)) {
 		walkExpressions(cons.Car, fn)
 		walkExpressions(cons.Cdr, fn)
 	}
-}
-
-// prettyPrintLisp renders pm.Expression using width-aware formatting and per-language rules.
-func prettyPrintLisp(expr pm.Expression, lang string) string {
-	var b strings.Builder
-	writeExprFit(&b, expr, 0, astMaxWidth, lang)
-	return b.String()
-}
-
-func writeExprFit(b *strings.Builder, expr pm.Expression, indent, width int, lang string) {
-	inline := inlineString(expr)
-	avail := width - indent
-	if avail <= 0 {
-		avail = 1
-	}
-	if len(inline) <= avail && compactOnly(lang) {
-		b.WriteString(inline)
-		return
-	}
-	if cons, ok := expr.(pm.Cons); ok {
-		writeListFit(b, cons, indent, width, lang)
-		return
-	}
-	// atom
-	b.WriteString(inline)
-}
-
-func writeListFit(b *strings.Builder, cons pm.Cons, indent, width int, lang string) {
-	elems, dot := collectList(cons)
-	if len(elems) == 0 {
-		b.WriteString("()")
-		return
-	}
-	innerIndent := indent + 2
-	b.WriteString("(")
-	firstInline := inlineString(elems[0])
-	b.WriteString(firstInline)
-	lineLen := 1 + len(firstInline)
-	forceBreak := headBreaks(lang, elems[0])
-	for i := 1; i < len(elems); i++ {
-		el := elems[i]
-		elInline := inlineString(el)
-		isField := isFieldList(el)
-		fieldName := fieldHeadName(el)
-		fieldInline := isField && allowInlineField(lang, fieldName)
-		if !forceBreak && (fieldInline || (!isField)) && lineLen+1+len(elInline) <= width {
-			b.WriteString(" ")
-			b.WriteString(elInline)
-			lineLen += 1 + len(elInline)
-			continue
-		}
-		b.WriteString("\n")
-		b.WriteString(strings.Repeat(" ", innerIndent))
-		writeExprFit(b, el, innerIndent, width, lang)
-		lineLen = width
-	}
-	if dot != nil {
-		dotInline := inlineString(dot)
-		if !forceBreak && lineLen+3+len(dotInline) <= width {
-			b.WriteString(" . ")
-			b.WriteString(dotInline)
-		} else {
-			b.WriteString("\n")
-			b.WriteString(strings.Repeat(" ", innerIndent))
-			b.WriteString(". ")
-			writeExprFit(b, dot, innerIndent+2, width, lang)
-		}
-	}
-	b.WriteString(")")
-}
-
-func inlineString(expr pm.Expression) string {
-	if cons, ok := expr.(pm.Cons); ok {
-		elems, dot := collectList(cons)
-		parts := make([]string, 0, len(elems))
-		for _, el := range elems {
-			parts = append(parts, inlineString(el))
-		}
-		s := "(" + strings.Join(parts, " ")
-		if dot != nil {
-			s += " . " + inlineString(dot)
-		}
-		s += ")"
-		return s
-	}
-	return fmt.Sprint(expr)
-}
-
-func collectList(expr pm.Cons) ([]pm.Expression, pm.Expression) {
-	var elems []pm.Expression
-	var tail pm.Expression
-	cur := pm.Expression(expr)
-	for {
-		c, ok := cur.(pm.Cons)
-		if !ok {
-			tail = cur
-			break
-		}
-		elems = append(elems, c.Car)
-		cur = c.Cdr
-	}
-	return elems, tail
-}
-
-func headBreaks(lang string, head pm.Expression) bool {
-	m := astBreakHeads[lang]
-	if m == nil {
-		return false
-	}
-	if s, ok := head.(pm.Symbol); ok {
-		_, yes := m[s.Name]
-		return yes
-	}
-	return false
-}
-
-func isFieldList(expr pm.Expression) bool {
-	c, ok := expr.(pm.Cons)
-	if !ok {
-		return false
-	}
-	elems, _ := collectList(c)
-	if len(elems) == 0 {
-		return false
-	}
-	if s, ok := elems[0].(pm.Symbol); ok {
-		return s.Name != ""
-	}
-	return false
-}
-
-func fieldHeadName(expr pm.Expression) string {
-	c, ok := expr.(pm.Cons)
-	if !ok {
-		return ""
-	}
-	elems, _ := collectList(c)
-	if len(elems) == 0 {
-		return ""
-	}
-	if s, ok := elems[0].(pm.Symbol); ok {
-		return s.Name
-	}
-	return ""
-}
-
-func allowInlineField(lang, field string) bool {
-	m := astInlineFields[lang]
-	if m == nil {
-		return false
-	}
-	_, ok := m[field]
-	return ok
-}
-
-func compactOnly(lang string) bool {
-	_, ok := astCompactLangs[lang]
-	return ok
 }
 
 // Helpers
@@ -593,4 +455,83 @@ func safeWriteFile(path string, data []byte) error {
 		return err
 	}
 	return os.WriteFile(path, data, 0o644) // #nosec G306
+}
+
+func loadHelpMarkdownBySlug(slug string) (string, error) {
+	dir := "glazed/pkg/doc/topics"
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return "", err
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		b, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		fm, body := splitFrontMatter(string(b))
+		var meta struct{ Slug string `yaml:"Slug"`; Title string `yaml:"Title"` }
+		if fm != "" {
+			_ = yaml.Unmarshal([]byte(fm), &meta)
+		}
+		nameSlug := strings.TrimSuffix(e.Name(), filepath.Ext(e.Name()))
+		if strings.EqualFold(meta.Slug, slug) || strings.EqualFold(meta.Title, slug) || strings.EqualFold(nameSlug, slug) {
+			return body, nil
+		}
+	}
+	return "", fmt.Errorf("help topic not found: %s", slug)
+}
+
+func splitFrontMatter(s string) (yamlPart string, body string) {
+	s := strings.TrimSpace(s)
+	if !strings.HasPrefix(s, "---") {
+		return "", s
+	}
+	rest := strings.TrimPrefix(s, "---")
+	parts := strings.SplitN(rest, "---", 2)
+	if len(parts) != 2 {
+		return "", s
+	}
+	return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
+}
+
+func builtinHelpMarkdown() string {
+	return `# Oak Pattern Matcher REPL
+
+## Commands
+- /lang <language>: set language (e.g., go, javascript)
+- /load <file>: load a source file and infer language
+- /ast [outFile]: pretty-print Lisp AST (width-aware)
+- /raw-ast [outFile]: verbose tree with positions/bytes/flags
+- /yaml-ast [outFile]: full YAML dump of the AST
+- /pattern <pattern>: run a pattern match against current AST
+- /help [topic]: show this help or render a help topic by slug
+
+## Keyboard
+- Tab: switch focus
+- Ctrl+H: toggle helper cheat sheet
+- Up/Down: history or selection
+- Enter: submit
+- c/y: copy code/text on selected entity
+- Ctrl+C: quit
+`}
+
+func patternCheatSheet() string {
+	return `### Pattern matching cheat sheet (Go)
+
+Try patterns like:
+- (function_declaration (name (identifier _)))
+- (function_declaration (name (identifier Simple)))
+- (parameter_declaration (name (identifier _)) (type (type_identifier string)))
+- (return_statement (expression_list (identifier _)))
+- (slice_type (element (type_identifier string)))
+
+Tips:
+- Use _ as wildcard in symbols
+- Use field-pairs: (name (identifier X))
+- Nest patterns to match deeper structures
+`
 }
