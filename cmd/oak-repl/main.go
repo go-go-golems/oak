@@ -12,6 +12,8 @@ import (
 
 	"github.com/go-go-golems/bobatea/pkg/logutil"
 	"github.com/go-go-golems/bobatea/pkg/repl"
+	"github.com/go-go-golems/glazed/pkg/help"
+	oakdoc "github.com/go-go-golems/oak/pkg/doc"
 	"github.com/go-go-golems/oak/pkg"
 	"github.com/go-go-golems/oak/pkg/api"
 	pm "github.com/go-go-golems/oak/pkg/patternmatcher"
@@ -26,6 +28,7 @@ var astMaxWidth int
 var astBreakHeads map[string]map[string]struct{}
 var astInlineFields map[string]map[string]struct{}
 var astCompactLangs map[string]struct{}
+var helpSys *help.HelpSystem
 
 func parseLangMapList(spec string) map[string]map[string]struct{} {
 	res := map[string]map[string]struct{}{}
@@ -116,20 +119,153 @@ func (e *PatternEvaluator) EvaluateStream(ctx context.Context, code string, emit
 		return nil
 	}
 	if strings.HasPrefix(in, "/help") {
-		// /help [topic]
+		// /help [topic] [--all] [--query DSL]
 		parts := strings.Fields(in)
-		if len(parts) == 1 {
-			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": builtinHelpMarkdown()}})
-			return nil
+		var topic string
+		var showAll bool
+		var queryDSL string
+		for i := 1; i < len(parts); i++ {
+			p := parts[i]
+			if p == "--all" {
+				showAll = true
+				continue
+			}
+			if strings.HasPrefix(p, "--query=") {
+				queryDSL = strings.TrimPrefix(p, "--query=")
+				continue
+			}
+			if p == "--query" && i+1 < len(parts) {
+				i++
+				queryDSL = parts[i]
+				continue
+			}
+			if !strings.HasPrefix(p, "--") && topic == "" {
+				topic = p
+			}
 		}
-		topic := strings.TrimSpace(parts[1])
-		md, err := loadHelpMarkdownBySlug(topic)
-		if err != nil || strings.TrimSpace(md) == "" {
-			// fallback to built-in
-			emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": builtinHelpMarkdown()}})
-			return nil
+
+		if helpSys != nil {
+			if queryDSL != "" {
+				// Free-form DSL query
+				// For now, show a hint and the built-in help (full DSL execution can be added later)
+				emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": "Query support is available via Glazed CLI. For now, use specific topics or --all."}})
+				return nil
+			}
+
+			if topic != "" {
+				if sec, err := helpSys.GetSectionWithSlug(topic); err == nil && sec != nil {
+					md := sec.Content
+					if !showAll {
+						emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": md}})
+						return nil
+					}
+					// showAll: also include related default sections
+					page := sec.DefaultGeneralTopic()
+					var b strings.Builder
+					b.WriteString(md)
+					for _, s := range page {
+						if strings.TrimSpace(s.Content) == "" {
+							continue
+						}
+						b.WriteString("\n\n## ")
+						b.WriteString(s.Title)
+						b.WriteString("\n\n")
+						b.WriteString(s.Content)
+					}
+					emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": b.String()}})
+					return nil
+				}
+			}
+
+			if showAll {
+				page := helpSys.GetTopLevelHelpPage()
+				var b strings.Builder
+				b.WriteString("# Available Help\n\n")
+				// General Topics
+				if len(page.AllGeneralTopics) > 0 {
+					b.WriteString("## General Topics\n\n")
+					for _, s := range page.AllGeneralTopics {
+						b.WriteString("- ")
+						b.WriteString(s.Slug)
+						if strings.TrimSpace(s.Title) != "" {
+							b.WriteString(" — ")
+							b.WriteString(s.Title)
+						}
+						if strings.TrimSpace(s.Short) != "" {
+							b.WriteString("\n  ")
+							b.WriteString(s.Short)
+						}
+						b.WriteString("\n")
+					}
+					b.WriteString("\n")
+				}
+				// Examples
+				if len(page.AllExamples) > 0 {
+					b.WriteString("## Examples\n\n")
+					for _, s := range page.AllExamples {
+						b.WriteString("- ")
+						b.WriteString(s.Slug)
+						if strings.TrimSpace(s.Title) != "" {
+							b.WriteString(" — ")
+							b.WriteString(s.Title)
+						}
+						if strings.TrimSpace(s.Short) != "" {
+							b.WriteString("\n  ")
+							b.WriteString(s.Short)
+						}
+						b.WriteString("\n")
+					}
+					b.WriteString("\n")
+				}
+				// Applications
+				if len(page.AllApplications) > 0 {
+					b.WriteString("## Applications\n\n")
+					for _, s := range page.AllApplications {
+						b.WriteString("- ")
+						b.WriteString(s.Slug)
+						if strings.TrimSpace(s.Title) != "" {
+							b.WriteString(" — ")
+							b.WriteString(s.Title)
+						}
+						if strings.TrimSpace(s.Short) != "" {
+							b.WriteString("\n  ")
+							b.WriteString(s.Short)
+						}
+						b.WriteString("\n")
+					}
+					b.WriteString("\n")
+				}
+				// Tutorials
+				if len(page.AllTutorials) > 0 {
+					b.WriteString("## Tutorials\n\n")
+					for _, s := range page.AllTutorials {
+						b.WriteString("- ")
+						b.WriteString(s.Slug)
+						if strings.TrimSpace(s.Title) != "" {
+							b.WriteString(" — ")
+							b.WriteString(s.Title)
+						}
+						if strings.TrimSpace(s.Short) != "" {
+							b.WriteString("\n  ")
+							b.WriteString(s.Short)
+						}
+						b.WriteString("\n")
+					}
+					b.WriteString("\n")
+				}
+				emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": b.String()}})
+				return nil
+			}
 		}
-		emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": md}})
+
+		// Fallback to file system scan then built-in
+		if topic != "" {
+			if md, err := loadHelpMarkdownBySlug(topic); err == nil && strings.TrimSpace(md) != "" {
+				emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": md}})
+				return nil
+			}
+		}
+		emit(repl.Event{Kind: repl.EventResultMarkdown, Props: map[string]any{"markdown": builtinHelpMarkdown()}})
 		return nil
 	}
 	if strings.HasPrefix(in, "/ast") {
@@ -374,6 +510,10 @@ func main() {
 	} else {
 		logutil.InitTUILoggingToDiscard(level)
 	}
+
+	// Initialize help system from embedded oak docs and local glazed topics
+	helpSys = help.NewHelpSystem()
+	_ = oakdoc.AddDocToHelpSystem(helpSys)
 
 	evaluator := &PatternEvaluator{}
 	config := repl.DefaultConfig()
