@@ -1,9 +1,11 @@
 package guru
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -17,16 +19,16 @@ type GuruResult struct {
 }
 
 // RunGuruQuery executes guru command with given position and returns results
-func RunGuruQuery(mode, position string, jsonOutput bool) ([]GuruResult, error) {
+func RunGuruQuery(ctx context.Context, mode, position string, jsonOutput bool) ([]GuruResult, error) {
 	args := []string{mode, position}
 	if jsonOutput {
 		args = append([]string{"-json"}, args...)
 	}
 
-	cmd := exec.Command("guru", args...)
-	output, err := cmd.Output()
+	cmd := exec.CommandContext(ctx, "guru", args...)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("guru command failed: %w", err)
+		return nil, fmt.Errorf("guru command failed: %w - %s", err, strings.TrimSpace(string(output)))
 	}
 
 	if jsonOutput {
@@ -78,10 +80,14 @@ func parseTextOutput(output []byte) []GuruResult {
 
 			// Try to parse line and column
 			if len(parts) >= 2 {
-				fmt.Sscanf(parts[1], "%d", &result.Line)
+				if lineNum, err := strconv.Atoi(strings.TrimSpace(parts[1])); err == nil {
+					result.Line = lineNum
+				}
 			}
 			if len(parts) >= 3 {
-				fmt.Sscanf(parts[2], "%d", &result.Column)
+				if colNum, err := strconv.Atoi(strings.TrimSpace(parts[2])); err == nil {
+					result.Column = colNum
+				}
 			}
 			if len(parts) >= 1 {
 				result.File = parts[0]
@@ -100,4 +106,3 @@ func parseTextOutput(output []byte) []GuruResult {
 
 	return results
 }
-

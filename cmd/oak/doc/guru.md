@@ -13,8 +13,15 @@ Commands:
 Flags:
   - --mode
   - --symbol
+  - --symbol-file
+  - --symbols-file
   - --file
   - --json
+  - --graph
+  - --graph-output
+  - --graph-max-nodes
+  - --output
+  - --no-glaze-output
 IsTemplate: false
 IsTopLevel: true
 ShowPerDefault: true
@@ -25,28 +32,102 @@ SectionType: GeneralTopic
 
 ## Overview
 
-The `guru` command enables semantic code analysis by running Go guru queries using symbol names instead of manual byte offsets. Unlike traditional guru usage that requires finding exact byte positions, this command automatically locates symbols in your codebase using Tree-sitter parsing, then executes guru queries to find references, callers, implementers, and other semantic relationships. This integration combines Tree-sitter's fast structural parsing with guru's deep semantic analysis capabilities, making code exploration and refactoring significantly more accessible.
+The `guru` command enables semantic code analysis by running Go guru queries using symbol names instead of manual byte offsets. Unlike traditional guru usage that requires finding exact byte positions, this command automatically locates symbols in your codebase using Tree-sitter parsing, then executes guru queries to find references, callers, implementers, and other semantic relationships. This integration combines Tree-sitter's fast structural parsing with guru's deep semantic analysis capabilities, making code exploration and refactoring significantly more accessible. It now also runs batches (multiple `--symbol` or manifest entries) and can export call/referrer graphs as DOT, Mermaid, or JSON.
 
-The command outputs structured data that can be formatted as JSON, YAML, CSV, or tables, enabling both interactive exploration and programmatic processing of code relationships.
+`oak guru` is a **dual command**:
+- Structured mode (Glazed) is the default and now renders **YAML** unless you override `--output`.
+- Text mode is still available via `--no-glaze-output`, which prints a human-friendly summary.
+
+You can also choose other Glazed output formats (`--output table`, `--output json`, etc.) without leaving structured mode.
 
 ## Basic Usage
 
-The `guru` command requires three parameters: the query mode, the symbol name, and the file containing that symbol. Tree-sitter automatically finds the symbol's position, eliminating the need to manually calculate byte offsets.
+The `guru` command needs three key bits of information: the query mode, at least one symbol (via `--symbol`), and a file that defines that symbol. Tree-sitter automatically finds the byte offset in that file so guru can run without any manual lookup.
 
 ```bash
-oak guru <mode> <symbol> --file <filepath>
+oak guru --mode referrers --symbol ProcessData --file pkg/processor/data.go
 ```
 
-**Required parameters:**
-- `mode`: The type of guru query to execute (referrers, callees, implements, etc.)
-- `symbol`: The name of the symbol to query (function, type, method, variable, or constant)
-- `--file`: Path to the file containing the symbol
+**Important flags:**
+- `--mode`: Guru query mode (referrers, callees, implements, definition, describe, freevars, peers, what, callstack)
+- `--symbol`: Symbol name (repeat the flag to run a batch)
+- `--file`: File that defines the symbol (used as a default when batch entries omit `file`)
 
-**Example:**
+For one-off queries, specify each flag once. For multiple symbols, repeat `--symbol` (optionally pairing with `--symbol-file`) or load a manifest via `--symbols-file`.
+
+## Output Modes
+
+- **Structured (default)**: Runs Glazed, defaults to YAML, and supports all Glazed flags:
+  ```bash
+  oak guru referrers ProcessData --file pkg/processor/data.go --output table
+  ```
+- **Human-readable**: Disable Glazed to see a plain-text summary:
+  ```bash
+  oak guru referrers ProcessData --file pkg/processor/data.go --no-glaze-output
+  ```
+
+Because Glazed is active by default, you can mix in filtering, field selection, templates, and other formatting options. Set `--output json` for machine parsing, `--output table` for terminals, or leave the default to get YAML.
+
+## Batch Execution
+
+Running the same guru mode over multiple symbols is now a single command. You can either repeat `--symbol`, provide matching `--symbol-file` entries, or point to a manifest file that lists each request.
+
 ```bash
-# Find all references to ProcessData function
-oak guru referrers ProcessData --file pkg/processor/data.go
+# Two symbols that share the same definition file
+oak guru \
+  --mode referrers \
+  --symbol ProcessData \
+  --symbol Cleanup \
+  --file pkg/processor/data.go
 ```
+
+When symbols live in different files, pair them with `--symbol-file` in the same order:
+
+```bash
+oak guru \
+  --mode definition \
+  --symbol FindSymbol --symbol-file pkg/guru/symbol_finder.go \
+  --symbol NewSymbolFinder --symbol-file pkg/guru/symbol_finder.go
+```
+
+For large batches, keep everything in a manifest (YAML or JSON) and pass it via `--symbols-file`:
+
+```yaml
+# symbols.yaml
+- mode: referrers
+  symbol: ProcessData
+  file: pkg/processor/data.go
+- symbol: Session
+  mode: implements
+  file: pkg/auth/interfaces.go
+```
+
+```bash
+oak guru --symbols-file symbols.yaml
+```
+
+Each entry runs independently so one failing symbol doesn't abort the rest. Structured output adds `symbol`, `symbol_file`, `symbol_type`, and `mode` columns, making it easy to group or filter downstream.
+
+## Graph Export
+
+Use the `--graph` flag to generate a quick visualization of `referrers`, `callees`, or `callstack` results. Three formats are available:
+
+- `--graph dot`: Graphviz-compatible DOT (ideal for `dot -Tsvg`)
+- `--graph mermaid`: Mermaid.js flow diagrams (copy into docs or markdown)
+- `--graph json`: Machine-readable nodes/edges
+
+Add `--graph-output <path>` to write each graph to disk. When you provide a directory, the command creates per-symbol files (for example `processdata.dot`). When you provide a file path and run a batch, it automatically suffixes the filename so results do not overwrite each other. Use `--graph-max-nodes` to skip rendering extremely large graphs.
+
+```bash
+oak guru \
+  --mode referrers \
+  --symbol HandleRequest \
+  --file pkg/http/server.go \
+  --graph mermaid \
+  --graph-output artifacts/graphs
+```
+
+In structured mode the first row for each symbol also contains `graph_format`, `graph_nodes`, `graph_edges`, and (if applicable) the rendered data or the filesystem path. If the graph is suppressed due to node limits, `graph_skipped_reason` explains why.
 
 ## Query Modes
 
