@@ -44,6 +44,7 @@ func InitRootCmd(docFS embed.FS) (*help.HelpSystem, error) {
 	RootCmd.AddCommand(RunCommandCmd)
 	RootCmd.AddCommand(ASTCmd)
 	RootCmd.AddCommand(PatternCmd)
+	RootCmd.AddCommand(GuruCmd)
 	return helpSystem, nil
 }
 
