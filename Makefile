@@ -79,5 +79,9 @@ glazed-lint-build:
 		GOBIN=$(dir $(GLAZED_LINT_BIN)) go install $(GLAZED_LINT_PKG); \
 	fi
 
+# Existing oak command implementations use legacy Cobra flag wiring; keep the
+# rollout gate enabled while the CLI is migrated incrementally.
+GLAZED_LINT_ALLOW_PATHS ?= cmd/oak/commands/
+
 glazed-lint: glazed-lint-build
-	GOWORK=off go vet -vettool=$(GLAZED_LINT_BIN) ./cmd/... ./pkg/...
+	GOWORK=off go vet -vettool=$(GLAZED_LINT_BIN) -glazedclilint.allow-paths=$(GLAZED_LINT_ALLOW_PATHS) ./cmd/... ./pkg/...
