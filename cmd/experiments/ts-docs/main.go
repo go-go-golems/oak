@@ -335,7 +335,7 @@ func generateMarkdown(functions []FunctionInfo, srcPath string) string {
 	}
 
 	// Write header
-	output.WriteString(fmt.Sprintf("# %s API Reference\n\n", title))
+	fmt.Fprintf(&output, "# %s API Reference\n\n", title)
 
 	// Group functions by file
 	fileMap := make(map[string][]FunctionInfo)
@@ -352,13 +352,13 @@ func generateMarkdown(functions []FunctionInfo, srcPath string) string {
 		}
 
 		// Create section heading
-		output.WriteString(fmt.Sprintf("- [%s](#%s)\n", relPath, strings.ReplaceAll(relPath, ".", "")))
+		fmt.Fprintf(&output, "- [%s](#%s)\n", relPath, strings.ReplaceAll(relPath, ".", ""))
 
 		// Add function links
 		for _, fn := range fileFunctions {
 			anchor := strings.ToLower(fn.Name)
 			anchor = strings.ReplaceAll(anchor, " ", "-")
-			output.WriteString(fmt.Sprintf("  - [%s](#%s)\n", fn.Name, anchor))
+			fmt.Fprintf(&output, "  - [%s](#%s)\n", fn.Name, anchor)
 		}
 	}
 	output.WriteString("\n")
@@ -371,12 +371,12 @@ func generateMarkdown(functions []FunctionInfo, srcPath string) string {
 		}
 
 		// File header
-		output.WriteString(fmt.Sprintf("## %s\n\n", relPath))
+		fmt.Fprintf(&output, "## %s\n\n", relPath)
 
 		// Document each function
 		for _, fn := range fileFunctions {
 			// Function heading
-			output.WriteString(fmt.Sprintf("### %s\n\n", fn.Name))
+			fmt.Fprintf(&output, "### %s\n\n", fn.Name)
 
 			// Export status
 			if fn.IsExported {
@@ -419,18 +419,18 @@ func generateMarkdown(functions []FunctionInfo, srcPath string) string {
 					if param.Type != "" {
 						typeInfo = fmt.Sprintf(" - *%s*", param.Type)
 					}
-					output.WriteString(fmt.Sprintf("- `%s`%s\n", param.Name, typeInfo))
+					fmt.Fprintf(&output, "- `%s`%s\n", param.Name, typeInfo)
 				}
 				output.WriteString("\n")
 			}
 
 			// Return type section if available
 			if fn.ReturnType != "" {
-				output.WriteString(fmt.Sprintf("**Returns:** *%s*\n\n", fn.ReturnType))
+				fmt.Fprintf(&output, "**Returns:** *%s*\n\n", fn.ReturnType)
 			}
 
 			// Source location
-			output.WriteString(fmt.Sprintf("*Defined in [%s:%d]*\n\n", relPath, fn.LineNumber))
+			fmt.Fprintf(&output, "*Defined in [%s:%d]*\n\n", relPath, fn.LineNumber)
 		}
 	}
 
