@@ -1,6 +1,6 @@
 module github.com/go-go-golems/oak
 
-go 1.25.0
+go 1.26.3
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.9.0
