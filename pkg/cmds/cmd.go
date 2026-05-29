@@ -17,10 +17,11 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/go-go-golems/glazed/pkg/cmds"
 	"github.com/go-go-golems/glazed/pkg/cmds/alias"
-	"github.com/go-go-golems/glazed/pkg/cmds/layers"
+	"github.com/go-go-golems/glazed/pkg/cmds/fields"
 	"github.com/go-go-golems/glazed/pkg/cmds/layout"
 	"github.com/go-go-golems/glazed/pkg/cmds/loaders"
-	"github.com/go-go-golems/glazed/pkg/cmds/parameters"
+	"github.com/go-go-golems/glazed/pkg/cmds/schema"
+	"github.com/go-go-golems/glazed/pkg/cmds/values"
 	"github.com/go-go-golems/glazed/pkg/helpers/compare"
 	"github.com/go-go-golems/glazed/pkg/helpers/templating"
 	"github.com/go-go-golems/oak/pkg"
@@ -34,27 +35,23 @@ import (
 var oakLayerYaml string
 
 type OakParameterLayer struct {
-	layers.ParameterLayerImpl `yaml:",inline"`
+	*schema.SectionImpl `yaml:",inline"`
 }
 
 const OakSlug = "oak"
 
 type OakSettings struct {
-	Recurse      bool     `glazed.parameter:"recurse"`
-	PrintQueries bool     `glazed.parameter:"print-queries"`
-	Glob         []string `glazed.parameter:"glob"`
+	Recurse      bool     `glazed:"recurse"`
+	PrintQueries bool     `glazed:"print-queries"`
+	Glob         []string `glazed:"glob"`
 }
 
-func NewOakParameterLayer(
-	options ...layers.ParameterLayerOptions,
-) (*OakParameterLayer, error) {
-	layer, err := layers.NewParameterLayerFromYAML([]byte(oakLayerYaml), options...)
+func NewOakParameterLayer() (*OakParameterLayer, error) {
+	section, err := schema.NewSectionFromYAML([]byte(oakLayerYaml))
 	if err != nil {
 		return nil, err
 	}
-	return &OakParameterLayer{
-		ParameterLayerImpl: *layer,
-	}, nil
+	return &OakParameterLayer{SectionImpl: section}, nil
 }
 
 type OakCommand struct {
@@ -71,12 +68,12 @@ type OakCommandDescription struct {
 	Queries  []tree_sitter.SitterQuery `yaml:"queries"`
 	Template string                    `yaml:"template,omitempty"`
 
-	Name   string                            `yaml:"name"`
-	Short  string                            `yaml:"short"`
-	Long   string                            `yaml:"long,omitempty"`
-	Layout []*layout.Section                 `yaml:"layout,omitempty"`
-	Flags  []*parameters.ParameterDefinition `yaml:"flags,omitempty"`
-	Layers []layers.ParameterLayer           `yaml:"layers,omitempty"`
+	Name   string               `yaml:"name"`
+	Short  string               `yaml:"short"`
+	Long   string               `yaml:"long,omitempty"`
+	Layout []*layout.Section    `yaml:"layout,omitempty"`
+	Flags  []*fields.Definition `yaml:"flags,omitempty"`
+	Layers []schema.Section     `yaml:"-"`
 
 	Parents []string `yaml:",omitempty"`
 	Source  string   `yaml:",omitempty"`
@@ -126,20 +123,20 @@ func (o *OakCommandLoader) loadCommandFromReader(
 		return nil, err
 	}
 
-	layers_ := append(ocd.Layers, oakLayer)
+	sections := append(ocd.Layers, oakLayer)
 
 	options_ := []cmds.CommandDescriptionOption{
 		cmds.WithName(ocd.Name),
 		cmds.WithShort(ocd.Short),
 		cmds.WithLong(ocd.Long),
 		cmds.WithFlags(ocd.Flags...),
-		cmds.WithLayersList(layers_...),
+		cmds.WithSections(sections...),
 		cmds.WithArguments(
-			parameters.NewParameterDefinition(
+			fields.New(
 				"sources",
-				parameters.ParameterTypeStringList,
-				parameters.WithHelp("Files (or directories if recursing) to parse"),
-				parameters.WithRequired(false),
+				fields.TypeStringList,
+				fields.WithHelp("Files (or directories if recursing) to parse"),
+				fields.WithRequired(false),
 			),
 		),
 		cmds.WithLayout(&layout.Layout{
@@ -336,8 +333,8 @@ func printNode(n *sitter.Node, depth int, name string) {
 //
 // WARNING: This is destructive and should only be called once.
 // NOTE(manuel, 2023-06-19) This is not a great API, but it will do for now.
-func (oc *OakCommand) RenderQueries(layers *layers.ParsedLayers) error {
-	ps := layers.GetDataMap()
+func (oc *OakCommand) RenderQueries(parsedValues *values.Values) error {
+	ps := parsedValues.GetDataMap()
 	for idx, query := range oc.Queries {
 		// we're ignoring the query because we want the index only, since we are not dealing with pointers
 		_ = query

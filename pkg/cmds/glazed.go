@@ -11,10 +11,10 @@ import (
 
 	"github.com/go-go-golems/glazed/pkg/cmds"
 	"github.com/go-go-golems/glazed/pkg/cmds/alias"
-	"github.com/go-go-golems/glazed/pkg/cmds/layers"
+	"github.com/go-go-golems/glazed/pkg/cmds/fields"
 	"github.com/go-go-golems/glazed/pkg/cmds/layout"
 	"github.com/go-go-golems/glazed/pkg/cmds/loaders"
-	"github.com/go-go-golems/glazed/pkg/cmds/parameters"
+	"github.com/go-go-golems/glazed/pkg/cmds/values"
 	"github.com/go-go-golems/glazed/pkg/middlewares"
 	"github.com/go-go-golems/glazed/pkg/settings"
 	"github.com/go-go-golems/glazed/pkg/types"
@@ -27,26 +27,26 @@ type OakGlazeCommand struct {
 var _ cmds.GlazeCommand = (*OakGlazeCommand)(nil)
 
 type RunSettings struct {
-	Sources []string `glazed.parameter:"sources"`
+	Sources []string `glazed:"sources"`
 }
 
 func (oc *OakGlazeCommand) RunIntoGlazeProcessor(
 	ctx context.Context,
-	parsedLayers *layers.ParsedLayers,
+	parsedValues *values.Values,
 	gp middlewares.Processor,
 ) error {
 	s := &RunSettings{}
-	err := parsedLayers.InitializeStruct(layers.DefaultSlug, s)
+	err := parsedValues.DecodeSectionInto(values.DefaultSlug, s)
 	if err != nil {
 		return err
 	}
 	ss := &OakSettings{}
-	err = parsedLayers.InitializeStruct(OakSlug, ss)
+	err = parsedValues.DecodeSectionInto(OakSlug, ss)
 	if err != nil {
 		return err
 	}
 
-	err = oc.RenderQueries(parsedLayers)
+	err = oc.RenderQueries(parsedValues)
 	if err != nil {
 		return err
 	}
@@ -172,24 +172,24 @@ func (o *OakGlazedCommandLoader) loadCommandFromReader(
 		return nil, err
 	}
 
-	glazeLayer, err := settings.NewGlazedParameterLayers()
+	glazeLayer, err := settings.NewGlazedSchema()
 	if err != nil {
 		return nil, err
 	}
-	layers := append(ocd.Layers, glazeLayer, oakLayer)
+	sections := append(ocd.Layers, glazeLayer, oakLayer)
 
 	options_ := []cmds.CommandDescriptionOption{
 		cmds.WithName(ocd.Name),
 		cmds.WithShort(ocd.Short),
 		cmds.WithLong(ocd.Long),
 		cmds.WithFlags(ocd.Flags...),
-		cmds.WithLayersList(layers...),
+		cmds.WithSections(sections...),
 		cmds.WithArguments(
-			parameters.NewParameterDefinition(
+			fields.New(
 				"sources",
-				parameters.ParameterTypeStringList,
-				parameters.WithHelp("Files (or directories if recursing) to parse"),
-				parameters.WithRequired(false),
+				fields.TypeStringList,
+				fields.WithHelp("Files (or directories if recursing) to parse"),
+				fields.WithRequired(false),
 			),
 		),
 		cmds.WithLayout(&layout.Layout{

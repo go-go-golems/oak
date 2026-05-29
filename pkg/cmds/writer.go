@@ -5,7 +5,7 @@ import (
 	"context"
 	_ "embed"
 	"github.com/go-go-golems/glazed/pkg/cmds"
-	"github.com/go-go-golems/glazed/pkg/cmds/layers"
+	"github.com/go-go-golems/glazed/pkg/cmds/values"
 	"github.com/go-go-golems/glazed/pkg/helpers/templating"
 	"github.com/go-go-golems/oak/pkg"
 	tree_sitter "github.com/go-go-golems/oak/pkg/tree-sitter"
@@ -33,21 +33,21 @@ func NewOakWriterCommand(d *cmds.CommandDescription, options ...OakCommandOption
 
 func (oc *OakWriterCommand) RunIntoWriter(
 	ctx context.Context,
-	parsedLayers *layers.ParsedLayers,
+	parsedValues *values.Values,
 	w io.Writer,
 ) error {
 	s := &RunSettings{}
-	err := parsedLayers.InitializeStruct(layers.DefaultSlug, s)
+	err := parsedValues.DecodeSectionInto(values.DefaultSlug, s)
 	if err != nil {
 		return err
 	}
 	ss := &OakSettings{}
-	err = parsedLayers.InitializeStruct(OakSlug, ss)
+	err = parsedValues.DecodeSectionInto(OakSlug, ss)
 	if err != nil {
 		return err
 	}
 
-	err = oc.RenderQueries(parsedLayers)
+	err = oc.RenderQueries(parsedValues)
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (oc *OakWriterCommand) RunIntoWriter(
 		}
 	}
 
-	data := parsedLayers.GetDataMap()
+	data := parsedValues.GetDataMap()
 	data["ResultsByFile"] = resultsByFile
 	data["Results"] = allResults
 

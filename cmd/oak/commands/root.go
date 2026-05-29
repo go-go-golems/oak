@@ -12,8 +12,9 @@ import (
 	"github.com/go-go-golems/glazed/pkg/cli"
 	glazed_cmds "github.com/go-go-golems/glazed/pkg/cmds"
 	"github.com/go-go-golems/glazed/pkg/cmds/alias"
-	"github.com/go-go-golems/glazed/pkg/cmds/layers"
 	"github.com/go-go-golems/glazed/pkg/cmds/loaders"
+	"github.com/go-go-golems/glazed/pkg/cmds/schema"
+	"github.com/go-go-golems/glazed/pkg/cmds/values"
 	"github.com/go-go-golems/glazed/pkg/help"
 	helpCmd "github.com/go-go-golems/glazed/pkg/help/cmd"
 	"github.com/go-go-golems/glazed/pkg/types"
@@ -63,7 +64,7 @@ func InitAllCommands(helpSystem *help.HelpSystem, queriesFS embed.FS) error {
 		helpSystem,
 		RootCmd,
 		repositories_,
-		cli.WithCobraShortHelpLayers(layers.DefaultSlug, cmds2.OakSlug),
+		cli.WithCobraShortHelpSections(schema.DefaultSlug, cmds2.OakSlug),
 	)
 	if err != nil {
 		return err
@@ -82,7 +83,7 @@ func InitAllCommands(helpSystem *help.HelpSystem, queriesFS embed.FS) error {
 		helpSystem,
 		glazeCmd,
 		repositories_,
-		cli.WithCobraShortHelpLayers(layers.DefaultSlug, cmds2.OakSlug),
+		cli.WithCobraShortHelpSections(schema.DefaultSlug, cmds2.OakSlug),
 	)
 	if err != nil {
 		return err
@@ -94,7 +95,7 @@ func InitAllCommands(helpSystem *help.HelpSystem, queriesFS embed.FS) error {
 		clay_commandmeta.WithListAddCommandToRowFunc(func(
 			command glazed_cmds.Command,
 			row types.Row,
-			parsedLayers *layers.ParsedLayers,
+			parsedValues *values.Values,
 		) ([]types.Row, error) {
 			ret := []types.Row{row}
 			switch c := command.(type) {
