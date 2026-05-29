@@ -1,0 +1,3 @@
+package oak
+
+//go:generate go tool logcopter-gen -include-main -var zlog -area-prefix go-go-golems.oak -strip-prefix github.com/go-go-golems/oak ./cmd/... ./pkg/...

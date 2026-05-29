@@ -1,6 +1,6 @@
 module github.com/go-go-golems/oak
 
-go 1.24.3
+go 1.26.3
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.9.0
@@ -8,8 +8,9 @@ require (
 	github.com/go-go-golems/bobatea v0.0.28
 	github.com/go-go-golems/clay v0.1.47
 	github.com/go-go-golems/glazed v0.6.12
+	github.com/go-go-golems/logcopter v0.1.0
 	github.com/pkg/errors v0.9.1
-	github.com/rs/zerolog v1.34.0
+	github.com/rs/zerolog v1.35.1
 	github.com/smacker/go-tree-sitter v0.0.0-20231219031718-233c2f923ac7
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
@@ -120,16 +121,20 @@ require (
 	go.etcd.io/bbolt v1.4.0 // indirect
 	go.mongodb.org/mongo-driver v1.14.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.40.0 // indirect
+	golang.org/x/crypto v0.51.0 // indirect
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0 // indirect
-	golang.org/x/net v0.42.0 // indirect
-	golang.org/x/sync v0.16.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
-	golang.org/x/term v0.34.0 // indirect
-	golang.org/x/text v0.27.0 // indirect
+	golang.org/x/mod v0.36.0 // indirect
+	golang.org/x/net v0.54.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/term v0.43.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/tools v0.45.0 // indirect
 	google.golang.org/protobuf v1.36.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
 //replace github.com/smacker/go-tree-sitter => github.com/wesen/go-tree-sitter v0.0.0-20230423204225-a896a22ee48a
+
+tool github.com/go-go-golems/logcopter/cmd/logcopter-gen
