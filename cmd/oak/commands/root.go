@@ -37,7 +37,7 @@ func InitRootCmd(docFS embed.FS) (*help.HelpSystem, error) {
 
 	helpCmd.SetupCobraRootCommand(helpSystem, RootCmd)
 
-	err = clay.InitViper("oak", RootCmd)
+	err = clay.InitViper("oak", RootCmd) //nolint:staticcheck // Full InitGlazed migration is out of scope for the release-train dependency bump.
 	if err != nil {
 		return nil, err
 	}
